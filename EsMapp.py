@@ -1,74 +1,56 @@
 import streamlit as st
+import requests
+from streamlit_lottie import st_lottie
 import os
 from openai import OpenAI
 
-# Initialize the OpenAI client
-client = OpenAI(
-    api_key="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",
-    base_url="https://openrouter.ai/api/v1"
-)
+# Set up for OpenRouter
+os.environ[
+    "OPENAI_API_KEY"] = "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"  # From https://openrouter.ai/settings/keys
+os.environ["OPENAI_BASE_URL"] = "https://openrouter.ai/api/v1"
 
-# Page configuration (must be first Streamlit command)
-st.set_page_config(
-    page_title="EsMa",
-    page_icon=":writing_hand:",
-    layout="wide"
-)
+client = OpenAI()
+saved_contents = []
 
-# Essay types
-list_essay_type = [
-    "Argumentative", "Persuasive", 'Explanatory', 'Descriptive',
-    "Narrative", 'Cause and Effect', "Process Analysis",
-    "Compare/Contrast", "General"
-]
+st.set_page_config(page_title="EsMa", page_icon=":writing_hand:", layout="wide")
+list_essay_type = ["Argumentative", "Persuasive", 'Explanatory', 'Descriptive', "Narrative",
+                   'Cause and Effect', "Process Analysis", "Compare/Contrast", "General"]
 
 
-def ai_assistant(prompt):
-    """Function to call the AI assistant"""
+def ai_assistant(x):
     response = client.chat.completions.create(
-        model="deepseek/deepseek-r1-distill-llama-70b:free",
-        messages=[
-            {
-                "role": "system",
-                "content": """You are EsMa (Essay Maker), a tool that helps students create essays.
-                Strictly only write the requested essay content, no additional commentary."""
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
+        model="deepseek/deepseek-chat-v3-0324:free",
+        messages=[{
+            "role": "system",
+            "content": """I shall name you EsMa short for Essay Maker. You are a tool helping students to create their essays.
+            You (Strictly) only need to write their essays and nothing else."""
+        }, {
+            "role": "user",
+            "content": x
+        }]
     )
-    return response.choices[0].message.content
+    result = response.choices[0].message.content
+    saved_contents.append(result)
+    return result
 
 
-# Main app function
-def main():
+# Main app interface
+with st.container():
     st.subheader("EsMa")
     st.title("Your Free Essay Maker Tool")
 
-    # User inputs
-    essay_type = st.selectbox("Select Essay Type", list_essay_type)
-    user_prompt = st.text_area(
-        "Enter your essay topic or instructions:",
-        "Write your prompt here...",
-        height=100
-    )
+    # Get essay type first
+    essay_type = st.selectbox("Essay Type", list_essay_type)
 
-    # Generate button
+    # Get user prompt
+    content_prompt = st.text_area("Prompt", "Write your prompt here:", height=100)
+
+    # Generate essay when button is clicked
     if st.button("Generate Essay"):
-        if user_prompt.strip() == "Write your prompt here..." or not user_prompt.strip():
-            st.warning("Please enter a valid prompt")
-        else:
+        if content_prompt and content_prompt != "Write your prompt here:":
+            full_prompt = f"Write a {essay_type} essay about: {content_prompt}"
             with st.spinner("Generating your essay..."):
-                full_prompt = f"Write a {essay_type} essay about: {user_prompt}"
-                try:
-                    essay = ai_assistant(full_prompt)
-                    st.text_area("Generated Essay", essay, height=300)
-                except Exception as e:
-                    st.error(f"An error occurred: {e}")
-
-
-# Run the main function
-if __name__ == "__main__":
-    main()
+                essay = ai_assistant(full_prompt)
+            st.text_area("Generated Essay", essay, height=300)
+        else:
+            st.warning("Please enter a prompt for your essay")
