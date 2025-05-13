@@ -8,27 +8,35 @@ from openai import OpenAI
 st.write("Secrets keys:", list(st.secrets.keys()))
 
 # Initialize client with multiple fallback options
+st.write("All secrets:", st.secrets)
+
 try:
-    api_key = (
-            st.secrets.get("OPENAI_API_KEY") or  # Streamlit Cloud
-            os.environ.get("OPENAI_API_KEY") or  # Environment variable
-            "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"  # Fallback (remove in production)
+    # Access nested secrets
+    api_key = st.secrets.openrouter.OPENAI_API_KEY
+    base_url = st.secrets.openrouter.OPENAI_BASE_URL
+
+    client = OpenAI(
+        api_key=api_key,
+        base_url=base_url
     )
 
-    base_url = (
-            st.secrets.get("OPENAI_API_KEY") or
-            os.environ.get("OPENAI_API_KEY") or
-            "https://openrouter.ai/api/v1"
-    )
+    # Test connection
+    client.models.list()
 
-    if not api_key or api_key == "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":
-        st.error("API key not configured. Please set OPENAI_API_KEY in secrets.")
-        st.stop()
-
-    client = OpenAI(api_key=api_key, base_url=base_url)
-
+except AttributeError as e:
+    st.error(f"""
+    Secret configuration error: {str(e)}
+    Current secret structure: {dict(st.secrets)}
+    Required structure:
+    ```
+    [openrouter]
+    OPENAI_API_KEY = "your_key"
+    OPENAI_BASE_URL = "https://openrouter.ai/api/v1"
+    ```
+    """)
+    st.stop()
 except Exception as d:
-    st.error(f"Failed to initialize API client: {str(d)}")
+    st.error(f"API connection failed: {str(d)}")
     st.stop()
 
 # Rest of your app...
