@@ -4,8 +4,8 @@ from openai import OpenAI
 
 # Initialize the OpenAI client with proper configuration
 client = OpenAI(
-    api_key=st.secrets["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"],  # Will use environment variable if available
-    base_url=st.secrets["https://openrouter.ai/api/v1"]
+    api_key=st.secrets["OPENAI_API_KEY"],
+    base_url=st.secrets["OPENAI_BASE_URL"]
 )
 
 st.set_page_config(
