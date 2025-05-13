@@ -3,14 +3,35 @@ import os
 from openai import OpenAI
 
 # Initialize the OpenAI client with proper configuration
+
+# Debug: Show loaded secrets (remove after testing)
+st.write("Secrets keys:", list(st.secrets.keys()))
+
+# Initialize client with multiple fallback options
 try:
-    client = OpenAI(
-        api_key=st.secrets["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"],
-        base_url=st.secrets.get("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
+    api_key = (
+            st.secrets.get("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") or  # Streamlit Cloud
+            os.environ.get("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") or  # Environment variable
+            "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"  # Fallback (remove in production)
     )
-except KeyError:
-    st.error("API key not found. Please configure secrets.")
-    st.stop()  # Stop the app if no API key
+
+    base_url = (
+            st.secrets.get("https://openrouter.ai/api/v1") or
+            os.environ.get("https://openrouter.ai/api/v1") or
+            "https://openrouter.ai/api/v1"
+    )
+
+    if not api_key or api_key == "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":
+        st.error("API key not configured. Please set OPENAI_API_KEY in secrets.")
+        st.stop()
+
+    client = OpenAI(api_key=api_key, base_url=base_url)
+
+except Exception as d:
+    st.error(f"Failed to initialize API client: {str(d)}")
+    st.stop()
+
+# Rest of your app...
 
 st.set_page_config(
     page_title="EsMa",
