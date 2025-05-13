@@ -10,14 +10,14 @@ st.write("Secrets keys:", list(st.secrets.keys()))
 # Initialize client with multiple fallback options
 try:
     api_key = (
-            st.secrets.get("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") or  # Streamlit Cloud
-            os.environ.get("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") or  # Environment variable
+            st.secrets.get("OPENAI_API_KEY") or  # Streamlit Cloud
+            os.environ.get("OPENAI_API_KEY") or  # Environment variable
             "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"  # Fallback (remove in production)
     )
 
     base_url = (
-            st.secrets.get("https://openrouter.ai/api/v1") or
-            os.environ.get("https://openrouter.ai/api/v1") or
+            st.secrets.get("OPENAI_API_KEY") or
+            os.environ.get("OPENAI_API_KEY") or
             "https://openrouter.ai/api/v1"
     )
 
