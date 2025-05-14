@@ -472,14 +472,14 @@ def page_3():
         except Exception as det:
             st.error(f"Failed to generate essay: {str(det)}")
             return None
-    with st.container():
-        prompt_ai = st.chat_input("Say something")
-        if prompt_ai:
-            st.write(ai_assistant(prompt_ai))
+
+    prompt_ai = st.chat_input("Say something")
+    if prompt_ai:
+        st.write(ai_assistant(prompt_ai))
 
 
 
-pg = st.navigation([st.Page(page_1, title = "Essay Maker"), st.Page(page_2, title = "Text To Speech"), st.Page(page_3, title = "AITO")])
+pg = st.navigation([st.Page(page_1, title = "Essay Maker"), st.Page(page_2, title = "Text To Speech"), st.Page(page_3, title = "AITO"),])
 pg.run()
 
 
