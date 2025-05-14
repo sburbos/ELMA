@@ -473,9 +473,18 @@ def page_3():
             st.error(f"Failed to generate essay: {str(det)}")
             return None
 
-    prompt_ai = st.chat_input("Say something")
-    if prompt_ai:
-        st.write(ai_assistant(prompt_ai))
+    st.title("💬 Chatbot")
+    st.caption("AITO")
+
+    for msg in st.session_state.messages:
+        st.chat_message(msg["role"]).write(msg["content"])
+
+    if prompt_ai := st.chat_input():
+        st.chat_message("user").write(prompt_ai)
+        response = ai_assistant(prompt_ai)
+        msg = response
+        st.session_state.messages.append({"role": "assistant", "content": msg})
+        st.chat_message("assistant").write(msg)
 
 
 
