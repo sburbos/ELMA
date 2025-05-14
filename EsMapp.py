@@ -52,6 +52,7 @@ list_essay_type = [
 
 list_level = ["Elementary", "Junior High", "Senior High", "Undergraduate", "Graduate", "Postgraduate", "PhD", "Masters", "Doctorate"]
 list_speech_type = ["Casual", "Intimate", "Formal", "Frozen", "Consultative"]
+col1, col2 = st.columns(2)
 
 def ai_assistant(prompt):
     try:
@@ -79,10 +80,15 @@ def ai_assistant(prompt):
 def main():
     st.subheader("EsMa")
     st.title("Your Free Essay Maker Tool")
-    level_essay = st.selectbox("Type-Level", list_level)
-    speech_type = st.selectbox("Type of Speech", list_speech_type)
-    essay_type = st.selectbox("Essay Type", list_essay_type)
-    word_num = st.text_area("Number of Words", "500", height=70)
+    with col1:
+        level_essay = st.selectbox("Type-Level", list_level)
+        speech_type = st.selectbox("Type of Speech", list_speech_type)
+
+    with col2:
+        essay_type = st.selectbox("Essay Type", list_essay_type)
+        word_num = st.text_area("Number of Words", "500", height=70)
+
+
     content_prompt = st.text_area("Prompt", "Write your prompt here:", height=150)
     other_info_prompt = st.text_area("Other Instructions", "Write your other istructions here: ", height=70)
 
