@@ -423,9 +423,63 @@ def page_2():
                     audio_bytes = f.read()
                 st.audio(audio_bytes, format="audio/mpeg", loop=True)
 
+def page_3():
+    try:
+        # Access nested secrets
+        api_key = st.secrets.openrouter.OPENAI_API_KEY
+        base_url = st.secrets.openrouter.OPENAI_BASE_URL
+
+        client = OpenAI(
+            api_key=api_key,
+            base_url=base_url
+        )
+
+        # Test connection
+        client.models.list()
+
+    except AttributeError as e:
+        st.error(f"""
+        Secret configuration error: {str(e)}
+        Current secret structure: {dict(st.secrets)}
+        Required structure:
+        ```
+        [openrouter]
+        OPENAI_API_KEY = "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"
+        OPENAI_BASE_URL = "https://openrouter.ai/api/v1"
+        ```
+        """)
+        st.stop()
+    except Exception as d:
+        st.error(f"API connection failed: {str(d)}")
+        st.stop()
+    def ai_assistant(prompt):
+        try:
+            response = client.chat.completions.create(
+                model="nousresearch/deephermes-3-mistral-24b-preview:free",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """You shall be named AITO a general AI TOol"""
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_tokens=20000  # Added to prevent timeouts
+            )
+            return response.choices[0].message.content
+        except Exception as det:
+            st.error(f"Failed to generate essay: {str(det)}")
+            return None
+    with st.container():
+        prompt_ai = st.chat_input("Say something")
+        if prompt_ai:
+            st.write(ai_assistant(prompt_ai))
 
 
-pg = st.navigation([st.Page(page_1, title = "Essay Maker"), st.Page(page_2, title = "Text To Speech")])
+
+pg = st.navigation([st.Page(page_1, title = "Essay Maker"), st.Page(page_2, title = "Text To Speech"), st.Page(page_3, title = "AITO")])
 pg.run()
 
 
