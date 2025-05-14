@@ -78,27 +78,28 @@ def ai_assistant(prompt):
 
 # Main app interface
 def main():
-    st.subheader("EsMa")
-    st.title("Your Free Essay Maker Tool")
+    with st.container():
+        st.subheader("EsMa")
+        st.title("Your Free Essay Maker Tool")
     with st.container():
         level_essay = left.selectbox("Type-Level", list_level)
         speech_type = left.selectbox("Type of Speech", list_speech_type)
         essay_type = right.selectbox("Essay Type", list_essay_type)
-        word_num = right.text_area("Number of Words", "500", height=70)
+        word_num = right.text_area("Number of Words", "500", height=50)
 
+    with st.container():
+        content_prompt = st.text_area("Prompt", "Write your prompt here:", height=150)
+        other_info_prompt = st.text_area("Other Instructions", "Write your other istructions here: ", height=70)
 
-    content_prompt = st.text_area("Prompt", "Write your prompt here:", height=150)
-    other_info_prompt = st.text_area("Other Instructions", "Write your other istructions here: ", height=70)
-
-    if st.button("Generate Essay"):
-        if content_prompt.strip() in ("", "Write your prompt here:"):
-            st.warning("Please enter a valid prompt")
-        else:
-            with st.spinner("Generating your essay..."):
-                full_prompt = f"Write a comprehensive {essay_type} education level: {level_essay}  type of speech: {speech_type} number of maximum words: {word_num} essay about: {content_prompt}. With extra task {other_info_prompt}"
-                essay = ai_assistant(full_prompt)
-                if essay:
-                    st.text_area("Generated Essay", value=essay, height=300)
+        if st.button("Generate Essay"):
+            if content_prompt.strip() in ("", "Write your prompt here:"):
+                st.warning("Please enter a valid prompt")
+            else:
+                with st.spinner("Generating your essay..."):
+                    full_prompt = f"Write a comprehensive {essay_type} education level: {level_essay}  type of speech: {speech_type} number of maximum words: {word_num} essay about: {content_prompt}. With extra task {other_info_prompt}"
+                    essay = ai_assistant(full_prompt)
+                    if essay:
+                        st.text_area("Generated Essay", value=essay, height=300)
 
 
 if __name__ == "__main__":
