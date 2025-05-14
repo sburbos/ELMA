@@ -10,8 +10,7 @@ st.set_page_config(
     layout="wide"
 )
 # Debug: Show loaded secrets (remove after testing)
-pages = [ st.Page("EsMapp.py", title="Essay Maker"),
-        st.Page("TeToS.py", title="Text to Speech"),]
+st.title("Page 1")
 
 try:
     # Access nested secrets
@@ -82,8 +81,6 @@ def ai_assistant(prompt):
 
 # Main app interface
 def main():
-    pg = st.navigation(pages)
-    pg.run()
     with st.container():
         left.subheader("EsMa by Elley")
         left.title("Your Free Essay Maker Tool")
@@ -116,6 +113,12 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+def page_2():
+    st.title("Page 2")
+
+pg = st.navigation(["EsMapp.py", page_2])
+pg.run()
 
 
 
