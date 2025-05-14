@@ -47,7 +47,7 @@ except Exception as d:
 list_essay_type = [
     "Argumentative", "Persuasive", 'Explanatory', 'Descriptive',
     "Narrative", 'Cause and Effect', "Process Analysis",
-    "Compare/Contrast", "General"
+    "Compare/Contrast","Critique", "Definition", "General"
 ]
 
 list_level = ["Elementary", "Junior High", "Senior High", "Undergraduate", "Graduate", "Postgraduate", "PhD", "Masters", "Doctorate"]
