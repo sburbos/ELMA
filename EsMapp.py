@@ -3,6 +3,8 @@ import streamlit as st
 from openai import OpenAI
 import edge_tts
 import asyncio
+
+
 # Initialize the OpenAI client with proper configuration
 
 st.set_page_config(
@@ -116,8 +118,68 @@ def page_1():
         main()
 
 
-async def text_to_speech(text, filename):
-    communicate = edge_tts.Communicate(text, "ja-JP-NanamiNeural")
+
+voices_by_gender = {
+    "Female": {
+        "AdriNeural": {"ShortName": "af-ZA-AdriNeural"},
+        "AminaNeural": {"ShortName": "ar-DZ-AminaNeural"},
+        "AmalNeural": {"ShortName": "ar-QA-AmalNeural"},
+        "AmanyNeural": {"ShortName": "ar-SY-AmanyNeural"},
+        "AyshaNeural": {"ShortName": "ar-OM-AyshaNeural"},
+        "BanuNeural": {"ShortName": "az-AZ-BanuNeural"},
+        "KalinaNeural": {"ShortName": "bg-BG-KalinaNeural"},
+        "LailaNeural": {"ShortName": "ar-BH-LailaNeural"},
+        "LaithNeural": {"ShortName": "ar-SY-LaithNeural"},  # Note: Male, moved below
+        "LaylaNeural": {"ShortName": "ar-LB-LaylaNeural"},
+        "MekdesNeural": {"ShortName": "am-ET-MekdesNeural"},
+        "MaryamNeural": {"ShortName": "ar-YE-MaryamNeural"},
+        "MounaNeural": {"ShortName": "ar-MA-MounaNeural"},
+        "NabanitaNeural": {"ShortName": "bn-BD-NabanitaNeural"},
+        "NouraNeural": {"ShortName": "ar-KW-NouraNeural"},
+        "PradeepNeural": {"ShortName": "bn-BD-PradeepNeural"},  # Note: Male, moved below
+        "RanaNeural": {"ShortName": "ar-IQ-RanaNeural"},
+        "ReemNeural": {"ShortName": "ar-TN-ReemNeural"},
+        "SalmaNeural": {"ShortName": "ar-EG-SalmaNeural"},
+        "SanaNeural": {"ShortName": "ar-JO-SanaNeural"},
+        "TanishaaNeural": {"ShortName": "bn-IN-TanishaaNeural"},
+        "VesnaNeural": {"ShortName": "bs-BA-VesnaNeural"},
+        "ZariyahNeural": {"ShortName": "ar-SA-ZariyahNeural"},
+        # Add all other Female voices here, sorted alphabetically by name
+    },
+    "Male": {
+        "AbdullahNeural": {"ShortName": "ar-OM-AbdullahNeural"},
+        "AliNeural": {"ShortName": "ar-BH-AliNeural"},
+        "AmehaNeural": {"ShortName": "am-ET-AmehaNeural"},
+        "BabekNeural": {"ShortName": "az-AZ-BabekNeural"},
+        "BasselNeural": {"ShortName": "ar-IQ-BasselNeural"},
+        "BashkarNeural": {"ShortName": "bn-IN-BashkarNeural"},
+        "BorislavNeural": {"ShortName": "bg-BG-BorislavNeural"},
+        "FahedNeural": {"ShortName": "ar-KW-FahedNeural"},
+        "GoranNeural": {"ShortName": "bs-BA-GoranNeural"},
+        "HamedNeural": {"ShortName": "ar-SA-HamedNeural"},
+        "HediNeural": {"ShortName": "ar-TN-HediNeural"},
+        "IlirNeural": {"ShortName": "sq-AL-IlirNeural"},
+        "IsmaelNeural": {"ShortName": "ar-DZ-IsmaelNeural"},
+        "JamalNeural": {"ShortName": "ar-MA-JamalNeural"},
+        "LaithNeural": {"ShortName": "ar-SY-LaithNeural"},
+        "MoazNeural": {"ShortName": "ar-QA-MoazNeural"},
+        "OmarNeural": {"ShortName": "ar-LY-OmarNeural"},
+        "PradeepNeural": {"ShortName": "bn-BD-PradeepNeural"},
+        "RamiNeural": {"ShortName": "ar-LB-RamiNeural"},
+        "SalehNeural": {"ShortName": "ar-YE-SalehNeural"},
+        "ShakirNeural": {"ShortName": "ar-EG-ShakirNeural"},
+        "TaimNeural": {"ShortName": "ar-JO-TaimNeural"},
+        "WillemNeural": {"ShortName": "af-ZA-WillemNeural"},
+        # Add all other Male voices here, sorted alphabetically by name
+    }
+}
+
+
+
+
+
+async def text_to_speech(text, filename, character):
+    communicate = edge_tts.Communicate(text, character)
     await communicate.save(filename)
     return filename  # Return filename after saving
 
@@ -125,6 +187,12 @@ def page_2():
     st.subheader("TeTos by Elley")
     st.title("Free Online Text-To-Speech Tool ")
     content_prompt = st.text_area("Prompt", "", height=150)
+    selected_voice = st.segmented_control('Point of View', ['Male', 'Female'], selection_mode="single")
+    voice_final = ""
+    if selected_voice == "Male":
+        voice_final = st.selectbox("Male Characters", list(voices_by_gender["Male"].keys()))
+    elif selected_voice == "Female":
+        voice_final = st.selectbox("Female Characters", list(voices_by_gender["Female"].keys()))
     if st.button("Generate Voice"):
         if content_prompt.strip() in ("", "Generated prompt"):
             st.warning("Please enter a valid prompt")
@@ -132,7 +200,7 @@ def page_2():
             with st.spinner("Generating your voice..."):
                 filename = "voice.mp3"
                 # Run the async function properly
-                asyncio.run(text_to_speech(content_prompt, filename))
+                asyncio.run(text_to_speech(content_prompt, filename,voice_final))
                 # Open the saved file and pass bytes to st.audio
                 with open(filename, "rb") as f:
                     audio_bytes = f.read()
