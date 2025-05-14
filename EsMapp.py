@@ -93,15 +93,15 @@ def main():
         selected_pov = left.segmented_control('Point of View', ['First', 'Second', 'Third'], selection_mode = "single")
 
     with st.container():
-        content_prompt = left.text_area("Prompt", "Write your prompt here:", height=150)
-        other_info_prompt = left.text_area("Other Instructions", "Write your other instructions here: ", height=70)
+        content_prompt = left.text_area("Prompt", "", height=150)
+        other_info_prompt = left.text_area("Other Instructions", "", height=70)
 
         if st.button("Generate Essay"):
             if content_prompt.strip() in ("", "Generated prompt"):
                 st.warning("Please enter a valid prompt")
             else:
                 with st.spinner("Generating your essay..."):
-                    full_prompt = f"Write a comprehensive {essay_type} point of view: {selected_pov} education level: {level_essay}  type of speech: {speech_type} number of minimum words: {word_num} essay about: {content_prompt}. With extra task {other_info_prompt}"
+                    full_prompt = f"Write a comprehensive {essay_type}, point of view: {selected_pov} point of view, education level: {level_essay},  type of speech: {speech_type}, number of minimum words: {word_num}, essay about: {content_prompt}. With extra task {other_info_prompt}"
                     essay = ai_assistant(full_prompt)
                     if essay:
                         right.text_area("Generated Essay", value=essay, height=680)
