@@ -60,14 +60,14 @@ def ai_assistant(prompt):
             messages=[
                 {
                     "role": "system",
-                    "content": """You are EsMa (Essay Maker). Strictly only write the requested essay content."""
+                    "content": """You are EsMa (Essay Maker). Strictly only write the requested essay content. Do not write any other information. Meaning only write paragraphs"""
                 },
                 {
                     "role": "user",
                     "content": prompt
                 }
             ],
-            max_tokens=2000  # Added to prevent timeouts
+            max_tokens=20000  # Added to prevent timeouts
         )
         return response.choices[0].message.content
     except Exception as det:
@@ -82,6 +82,7 @@ def main():
     level_essay = st.selectbox("Type-Level", list_level)
     speech_type = st.selectbox("Type of Speech", list_speech_type)
     essay_type = st.selectbox("Essay Type", list_essay_type)
+    word_num = st.text_area("Number of Words", "500", height=50)
     content_prompt = st.text_area("Prompt", "Write your prompt here:", height=150)
     other_info_prompt = st.text_area("Other Instructions", "Write your other istructions here: ", height=70)
 
@@ -90,7 +91,7 @@ def main():
             st.warning("Please enter a valid prompt")
         else:
             with st.spinner("Generating your essay..."):
-                full_prompt = f"Write a comprehensive {essay_type} education level: {level_essay}  type of speech: {speech_type}essay about: {content_prompt}. With extra task {other_info_prompt}"
+                full_prompt = f"Write a comprehensive {essay_type} education level: {level_essay}  type of speech: {speech_type} number of maximum words: {word_num} essay about: {content_prompt}. With extra task {other_info_prompt}"
                 essay = ai_assistant(full_prompt)
                 if essay:
                     st.text_area("Generated Essay", value=essay, height=300)
