@@ -200,7 +200,8 @@ def page_2():
             with st.spinner("Generating your voice..."):
                 filename = "voice.mp3"
                 # Run the async function properly
-                asyncio.run(text_to_speech(content_prompt, filename,voice_final))
+                voice_arranged = voice_final[selected_voice][voice_final]["ShortName"]
+                asyncio.run(text_to_speech(content_prompt, filename,voice_arranged))
                 # Open the saved file and pass bytes to st.audio
                 with open(filename, "rb") as f:
                     audio_bytes = f.read()
