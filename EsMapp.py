@@ -454,45 +454,45 @@ def page_3():
         st.error(f"API connection failed: {str(d)}")
         st.stop()
 
-    def ai_assistant(prompt):
+    def ai_assistant(messages):
         try:
             response = client.chat.completions.create(
                 model="nousresearch/deephermes-3-mistral-24b-preview:free",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """You shall be named AITO a general AI TOol"""
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                max_tokens=20000  # Added to prevent timeouts
+                messages=messages,
+                max_tokens=20000
             )
             return response.choices[0].message.content
         except Exception as det:
-            st.error(f"Failed to generate essay: {str(det)}")
+            st.error(f"Failed to generate response: {str(det)}")
             return None
 
     st.title("💬 Chatbot")
     st.caption("AITO")
 
-    # Initialize messages in session state if it doesn't exist
+    # Initialize chat history
     if "messages" not in st.session_state:
-        st.session_state.messages = []
+        st.session_state.messages = [
+            {"role": "system", "content": "You shall be named AITO a general AI TOol"}
+        ]
 
+    # Display chat messages from history
     for msg in st.session_state.messages:
-        st.chat_message(msg["role"]).write(msg["content"])
+        if msg["role"] != "system":  # Don't display system messages
+            st.chat_message(msg["role"]).write(msg["content"])
 
-    if prompt_ai := st.chat_input():
-        st.chat_message("user").write(prompt_ai)
-        st.session_state.messages.append({"role": "user", "content": prompt_ai})
-        response = ai_assistant(prompt_ai)
+    # Accept user input
+    if prompt := st.chat_input():
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.chat_message("user").write(prompt)
+
+        # Get AI response with full conversation history
+        response = ai_assistant(st.session_state.messages)
+
         if response:
-            msg = response
-            st.chat_message("assistant").write(msg)
-            st.session_state.messages.append({"role": "assistant", "content": msg})
+            # Add AI response to chat history
+            st.session_state.messages.append({"role": "assistant", "content": response})
+            st.chat_message("assistant").write(response)
 
 
 
