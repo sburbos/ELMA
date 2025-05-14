@@ -88,7 +88,7 @@ def main():
         level_essay = left.selectbox("Type-Level", list_level)
         speech_type = left.selectbox("Type of Speech", list_speech_type)
         essay_type = left.selectbox("Essay Type", list_essay_type)
-        word_num = left.select_slider("Select Number Words", 0, 10000, 25)
+        word_num = left.select_slider("Select Number Words", 0, 10000, 100, 100)
 
     with st.container():
         content_prompt = left.text_area("Prompt", "Write your prompt here:", height=150)
