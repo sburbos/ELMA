@@ -52,7 +52,7 @@ list_essay_type = [
 
 list_level = ["Elementary", "Junior High", "Senior High", "Undergraduate", "Graduate", "Postgraduate", "PhD", "Masters", "Doctorate"]
 list_speech_type = ["Casual", "Intimate", "Formal", "Frozen", "Consultative"]
-left,center, right = st.columns(3, vertical_alignment="top")
+left, right = st.columns(2, vertical_alignment="top")
 
 def ai_assistant(prompt):
     try:
@@ -84,12 +84,12 @@ def main():
     with st.container():
         level_essay = left.selectbox("Type-Level", list_level)
         speech_type = left.selectbox("Type of Speech", list_speech_type)
-        essay_type = right.selectbox("Essay Type", list_essay_type)
-        word_num = right.text_area("Number of Words", "500", height=70)
+        essay_type = left.selectbox("Essay Type", list_essay_type)
+        word_num = left.text_area("Number of Words", "500", height=70)
 
     with st.container():
-        content_prompt = center.text_area("Prompt", "Write your prompt here:", height=150)
-        other_info_prompt = center.text_area("Other Instructions", "Write your other istructions here: ", height=70)
+        content_prompt = left.text_area("Prompt", "Write your prompt here:", height=150)
+        other_info_prompt = left.text_area("Other Instructions", "Write your other istructions here: ", height=70)
 
         if st.button("Generate Essay"):
             if content_prompt.strip() in ("", "Write your prompt here:"):
@@ -99,7 +99,7 @@ def main():
                     full_prompt = f"Write a comprehensive {essay_type} education level: {level_essay}  type of speech: {speech_type} number of maximum words: {word_num} essay about: {content_prompt}. With extra task {other_info_prompt}"
                     essay = ai_assistant(full_prompt)
                     if essay:
-                        st.text_area("Generated Essay", value=essay, height=300)
+                        right.text_area("Generated Essay", value=essay, height=300)
 
 
 if __name__ == "__main__":
