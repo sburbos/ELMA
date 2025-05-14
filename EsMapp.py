@@ -156,8 +156,8 @@ def page_1():
                 content_type = left.selectbox("Type of Content", content_list_content)
                 content_complexity = left.selectbox("Content Complexity", content_list_complexity)
                 content_tier = left.selectbox("Content Tier", content_list_tiers)
-                selected_character= left.selectbox("Select Language", content_creator_types)
-                speech = left.segmented_control('Point of View', languages, selection_mode="single")
+                selected_character= left.selectbox("Archetype", content_creator_types)
+                speech = left.segmented_control('Language', languages, selection_mode="single")
 
             with st.container():
                 content_prompt = left.text_area("Prompt", "", height=150)
