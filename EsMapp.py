@@ -11,7 +11,7 @@ st.set_page_config(
 )
 # Debug: Show loaded secrets (remove after testing)
 pages = [ st.Page("EsMapp.py", title="Essay Maker"),
-        st.Page("manage_account.py", title="Manage your account"),]
+        st.Page("TeToS.py", title="Manage your account"),]
 
 try:
     # Access nested secrets
