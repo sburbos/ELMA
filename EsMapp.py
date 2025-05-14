@@ -9,43 +9,44 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. INITIALIZE VARIABLES WITH DEFAULTS
-api_key = None
-base_url = "https://openrouter.ai/api/v1"  # Default value
+# 2. API CONFIGURATION
+BASE_URL = "https://openrouter.ai/api/v1"
+MODEL_NAME = "deepseek/deepseek-chat-v3-0324:free"
 
-# 3. SECURE CREDENTIALS SETUP
+# 3. SECURE CREDENTIALS HANDLING
 try:
-    # Safely get credentials with fallbacks
-    api_key = (
-        st.secrets.openrouter.OPENAI_API_KEY
-        if hasattr(st, 'secrets') and hasattr(st.secrets, 'openrouter')
-        else None
-    )
-
-    if not api_key:
-        st.error("❌ API key not found in secrets")
+    # Get API key with proper existence checks
+    if not hasattr(st, 'secrets') or not hasattr(st.secrets, 'openrouter'):
+        st.error("❌ Secrets not configured properly")
         st.stop()
 
-    # Verify credentials
-    auth_test = requests.post(
-        f"{base_url}/auth/key",
+    api_key = st.secrets.openrouter.OPENAI_API_KEY
+
+    # Verify API key is valid format
+    if not api_key.startswith("sk-or-v1-"):
+        st.error("❌ Invalid API key format")
+        st.stop()
+
+    # Test authentication with correct endpoint
+    auth_response = requests.get(
+        f"{BASE_URL}/auth/key",
         headers={"Authorization": f"Bearer {api_key}"},
         timeout=10
     )
 
-    if auth_test.status_code != 200:
-        st.error(f"🔒 Authentication Failed (HTTP {auth_test.status_code})")
-        st.json(auth_test.json())
+    if auth_response.status_code != 200:
+        st.error(f"🔒 Authentication Failed (HTTP {auth_response.status_code})")
+        st.json(auth_response.json())
         st.stop()
 
 except Exception as e:
     st.error(f"⚙️ Configuration Error: {str(e)}")
     st.stop()
 
-# 4. CLIENT CONFIGURATION (only reached if api_key exists)
+# 4. CLIENT SETUP WITH PROPER ENDPOINTS
 client = OpenAI(
-    api_key=api_key,  # Now guaranteed to exist
-    base_url=base_url,
+    api_key=api_key,
+    base_url=BASE_URL,
     default_headers={
         "HTTP-Referer": st.secrets.get("SITE_URL", "http://localhost:8501"),
         "X-Title": "EsMa Essay Generator"
@@ -53,35 +54,26 @@ client = OpenAI(
 )
 
 
-# ... rest of your code remains the same ...
-
-
-# 4. ESSAY GENERATION FUNCTION
-def generate_essay(prompt_enter, essay_type_in):
+# 5. ESSAY GENERATION FUNCTION
+def generate_essay(prompt: str, essay_type: str) -> str:
     try:
         response = client.chat.completions.create(
-            model="deepseek/deepseek-chat-v3-0324:free",
+            model=MODEL_NAME,
             messages=[
-                {
-                    "role": "system",
-                    "content": "You are EsMa. Write a detailed, well-structured essay."
-                },
-                {
-                    "role": "user",
-                    "content": f"Write a {essay_type_in} essay about: {prompt_enter}"
-                }
+                {"role": "system", "content": "You are EsMa, an AI essay writing assistant."},
+                {"role": "user", "content": f"Write a {essay_type} essay about: {prompt}"}
             ],
             max_tokens=2000,
             temperature=0.7
         )
         return response.choices[0].message.content
-    except Exception as d:
-        st.error(f"🚨 Generation Error: {str(d)}")
+    except Exception as e:
+        st.error(f"🚨 Generation Error: {str(e)}")
         return None
 
 
-# 5. STREAMLIT UI
-st.title("✍️ EsMa - AI Essay Generator")
+# 6. STREAMLIT UI
+st.title("✍️ EsMa Essay Generator")
 
 with st.form("essay_form"):
     essay_type = st.selectbox(
@@ -90,7 +82,7 @@ with st.form("essay_form"):
     )
     prompt = st.text_area(
         "Your Topic",
-        "The impact of artificial intelligence on education...",
+        "The impact of artificial intelligence on modern education...",
         height=150
     )
 
@@ -99,10 +91,16 @@ with st.form("essay_form"):
             essay = generate_essay(prompt, essay_type)
 
         if essay:
-            st.success("✅ Essay Generated!")
+            st.success("✅ Essay Generated Successfully!")
             st.text_area("Result", essay, height=300)
             st.download_button(
                 "Download Essay",
                 essay,
-                file_name=f"{essay_type}_essay.txt"
+                file_name=f"{essay_type.lower()}_essay.txt"
             )
+
+# 7. DEBUG SECTION (REMOVE IN PRODUCTION)
+with st.expander("🔍 Debug Info"):
+    st.write("API Base URL:", BASE_URL)
+    st.write("Model Name:", MODEL_NAME)
+    st.write("Key Prefix:", api_key[:10] + "..." if api_key else "None")
