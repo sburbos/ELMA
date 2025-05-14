@@ -423,6 +423,7 @@ def page_2():
                     audio_bytes = f.read()
                 st.audio(audio_bytes, format="audio/mpeg", loop=True)
 
+
 def page_3():
     try:
         # Access nested secrets
@@ -452,6 +453,7 @@ def page_3():
     except Exception as d:
         st.error(f"API connection failed: {str(d)}")
         st.stop()
+
     def ai_assistant(prompt):
         try:
             response = client.chat.completions.create(
@@ -476,14 +478,21 @@ def page_3():
     st.title("💬 Chatbot")
     st.caption("AITO")
 
+    # Initialize messages in session state if it doesn't exist
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
     for msg in st.session_state.messages:
         st.chat_message(msg["role"]).write(msg["content"])
 
     if prompt_ai := st.chat_input():
         st.chat_message("user").write(prompt_ai)
+        st.session_state.messages.append({"role": "user", "content": prompt_ai})
         response = ai_assistant(prompt_ai)
-        msg = response
-        st.chat_message("assistant").write(msg)
+        if response:
+            msg = response
+            st.chat_message("assistant").write(msg)
+            st.session_state.messages.append({"role": "assistant", "content": msg})
 
 
 
