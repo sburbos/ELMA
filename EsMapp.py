@@ -125,7 +125,7 @@ def page_1():
             right.subheader("")
             right.title("")
         on = right.toggle("Activate Content Creation")
-        if on:
+        if not on:
             with st.container():
                 level_essay = left.selectbox("Type-Level", list_level)
                 speech_type = left.selectbox("Type of Speech", list_speech_type)
@@ -156,7 +156,8 @@ def page_1():
                 content_type = left.selectbox("Type of Content", content_list_content)
                 content_complexity = left.selectbox("Content Complexity", content_list_complexity)
                 content_tier = left.selectbox("Content Tier", content_list_tiers)
-                selected_character = left.segmented_control('Point of View', content_creator_types, selection_mode="single")
+                selected_character= left.selectbox("Select Language", content_creator_types)
+                speech = left.segmented_control('Point of View', languages, selection_mode="single")
 
             with st.container():
                 content_prompt = left.text_area("Prompt", "", height=150)
@@ -167,7 +168,7 @@ def page_1():
                         st.warning("Please enter a valid prompt")
                     else:
                         with st.spinner("Generating your essay..."):
-                            full_prompt = f"""Write a content about: {content_prompt} that will be posted or used in: {content_place}
+                            full_prompt = f"""Write a content about: {content_prompt} in a language:{speech}that will be posted or used in: {content_place}
                             having a content type: {content_type}, having a content complexity: {content_complexity}, having a content tier for: {content_tier}
                             and will portray a character: {selected_character}. With extra task {other_info_prompt}
                                                 
