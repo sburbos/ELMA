@@ -134,7 +134,7 @@ def page_2():
             with st.spinner("Generating your essay..."):
                 filename = "voice.mp3"
                 file = asyncio.run(text_to_speech(content_prompt, filename))
-                if essay:
+                if file:
                     st.audio(file, format="audio/mpeg", loop=True)
 
 
