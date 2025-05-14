@@ -1,5 +1,5 @@
 import streamlit as st
-import os
+
 from openai import OpenAI
 import edge_tts
 import asyncio
@@ -119,14 +119,12 @@ def page_1():
 async def text_to_speech(text, filename):
     communicate = edge_tts.Communicate(text, "ja-JP-NanamiNeural")
     await communicate.save(filename)
-    return filename  # Return the filename so we can use it later
-
+    return filename  # Return filename after saving
 
 def page_2():
     st.subheader("TeTos by Elley")
-    st.title("Free Online Text-To-Speech Tool")
+    st.title("Free Online Text-To-Speech Tool ")
     content_prompt = st.text_area("Prompt", "", height=150)
-
     if st.button("Generate Voice"):
         if content_prompt.strip() in ("", "Generated prompt"):
             st.warning("Please enter a valid prompt")
@@ -135,8 +133,7 @@ def page_2():
                 filename = "voice.mp3"
                 # Run the async function properly
                 asyncio.run(text_to_speech(content_prompt, filename))
-
-                # Open the generated file and play it
+                # Open the saved file and pass bytes to st.audio
                 with open(filename, "rb") as f:
                     audio_bytes = f.read()
                 st.audio(audio_bytes, format="audio/mpeg", loop=True)
