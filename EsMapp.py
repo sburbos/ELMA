@@ -82,6 +82,8 @@ def ai_assistant(prompt):
 
 # Main app interface
 def main():
+    pg = st.navigation(pages)
+    pg.run()
     with st.container():
         left.subheader("EsMa by Elley")
         left.title("Your Free Essay Maker Tool")
@@ -117,5 +119,3 @@ if __name__ == "__main__":
 
 
 
-pg = st.navigation(pages)
-pg.run()
