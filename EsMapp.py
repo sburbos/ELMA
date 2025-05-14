@@ -96,7 +96,7 @@ def main():
         right.text_area("Generated Prompt", value=content_prompt, height=300)
 
         if st.button("Generate Essay"):
-            if content_prompt.strip() in ("", "Write your prompt here:"):
+            if content_prompt.strip() in ("", "Generated prompt"):
                 st.warning("Please enter a valid prompt")
             else:
                 with st.spinner("Generating your essay..."):
