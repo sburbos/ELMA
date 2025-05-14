@@ -50,6 +50,7 @@ list_essay_type = [
     "Compare/Contrast", "General"
 ]
 
+list_level = ["Elementary", "Junior High", "Senior High", "Undergraduate", "Graduate", "Postgraduate", "PhD", "Masters", "Doctorate"]
 
 def ai_assistant(prompt):
     try:
@@ -77,16 +78,17 @@ def ai_assistant(prompt):
 def main():
     st.subheader("EsMa")
     st.title("Your Free Essay Maker Tool")
-
+    level_essay = st.selectbox("Type-Level", list_level)
     essay_type = st.selectbox("Essay Type", list_essay_type)
     content_prompt = st.text_area("Prompt", "Write your prompt here:", height=100)
+    other_info_prompt = st.text_area("Other Instructions", "Write your other istructions here: ", height=100)
 
     if st.button("Generate Essay"):
         if content_prompt.strip() in ("", "Write your prompt here:"):
             st.warning("Please enter a valid prompt")
         else:
             with st.spinner("Generating your essay..."):
-                full_prompt = f"Write a comprehensive {essay_type} essay about: {content_prompt}"
+                full_prompt = f"Write a comprehensive {essay_type} education level; {level_essay} essay about: {content_prompt}. With extra task {other_info_prompt}"
                 essay = ai_assistant(full_prompt)
                 if essay:
                     st.text_area("Generated Essay", value=essay, height=300)
