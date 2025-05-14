@@ -117,5 +117,5 @@ def page_1():
 def page_2():
     st.title('Text to Speech')
 
-pg = st.navigation([page_1, page_2])
+pg = st.navigation([Essay_Maker, Text_to_Speech])
 pg.run()
