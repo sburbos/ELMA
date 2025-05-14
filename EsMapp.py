@@ -82,6 +82,8 @@ def main():
     with st.container():
         left.subheader("EsMa")
         left.title("Your Free Essay Maker Tool")
+        right.subheader("")
+        right.title("")
     with st.container():
         level_essay = left.selectbox("Type-Level", list_level)
         speech_type = left.selectbox("Type of Speech", list_speech_type)
