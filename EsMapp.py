@@ -127,9 +127,16 @@ def page_2():
     st.subheader("TeTos by Elley")
     st.title("Free Online Text-To-Speech Tool ")
     content_prompt = st.text_area("Prompt", "", height=150)
-    filename = "voice.mp3"
-    file =  asyncio.run(text_to_speech(content_prompt, filename))
-    st.audio(file, format="audio/mpeg", loop=True)
+    if st.button("Generate Voice"):
+        if content_prompt.strip() in ("", "Generated prompt"):
+            st.warning("Please enter a valid prompt")
+        else:
+            with st.spinner("Generating your essay..."):
+                filename = "voice.mp3"
+                file = asyncio.run(text_to_speech(content_prompt, filename))
+                if essay:
+                    st.audio(file, format="audio/mpeg", loop=True)
+
 
 
 pg = st.navigation([st.Page(page_1, title = "Essay Maker"), st.Page(page_2, title = "Text To Speech")])
