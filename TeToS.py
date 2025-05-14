@@ -13,8 +13,5 @@ pages = [ st.Page("EsMapp.py", title="Essay Maker"),
         st.Page("TeToS.py", title="Text To Speech"),]
 
 
-def page_2():
-    st.title('Text to Speech')
-
 pg = st.navigation(pages)
 pg.run()
