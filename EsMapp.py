@@ -61,7 +61,8 @@ def ai_assistant(prompt):
             messages=[
                 {
                     "role": "system",
-                    "content": """You are EsMa (Essay Maker). Strictly only write the requested essay content. Do not write any other information. Meaning only write paragraphs"""
+                    "content": """You are EsMa (Essay Maker). Strictly only write the requested essay content. 
+                    Do not write any other information. Meaning, only write paragraphs. Also the output must have be clear and specific with no vague output"""
                 },
                 {
                     "role": "user",
@@ -89,7 +90,8 @@ def main():
 
     with st.container():
         content_prompt = left.text_area("Prompt", "Write your prompt here:", height=150)
-        other_info_prompt = left.text_area("Other Instructions", "Write your other istructions here: ", height=70)
+        other_info_prompt = left.text_area("Other Instructions", "Write your other instructions here: ", height=70)
+        right.text_area("Generated Prompt", value=content_prompt, height=300)
 
         if st.button("Generate Essay"):
             if content_prompt.strip() in ("", "Write your prompt here:"):
