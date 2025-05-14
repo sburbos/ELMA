@@ -251,7 +251,7 @@ voices_by_gender = {
     "YunjianNeural (Chinese)": {"ShortName": "zh-CN-YunjianNeural"},
     "YunxiNeural (Chinese)": {"ShortName": "zh-CN-YunxiNeural"},
     "YunxiaNeural (Chinese)": {"ShortName": "zh-CN-YunxiaNeural"},
-    "YunyangNeural (Chinese)": {"ShortName": "zh-CN-YunyangNeural"}
+    "YunyangNeural (Chinese)": {"ShortName": "zh-CN-YunyangNeural"},
   },
   "Female": {
     "AarohiNeural (Marathi)": {"ShortName": "mr-IN-AarohiNeural"},
@@ -386,8 +386,8 @@ voices_by_gender = {
     "YesuiNeural (Mongolian)": {"ShortName": "mn-MN-YesuiNeural"},
     "ZariyahNeural (Saudi Arabia)": {"ShortName": "ar-SA-ZariyahNeural"},
     "ZofiaNeural (Polish)": {"ShortName": "pl-PL-ZofiaNeural"},
-    "ZuriNeural (Swahili Kenya)": {"ShortName": "sw-KE-ZuriNeural"}
-  }
+    "ZuriNeural (Swahili Kenya)": {"ShortName": "sw-KE-ZuriNeural"},
+  },
 }
 
 
@@ -404,9 +404,10 @@ def page_2():
     st.title("Free Online Text-To-Speech Tool ")
     content_prompt = st.text_area("Prompt", "", height=150)
     selected_voice = st.segmented_control('Point of View', ['Male', 'Female'], selection_mode="single")
+    voice_final = None
     if selected_voice == "Male":
         voice_final = st.selectbox("Male Characters", list(voices_by_gender["Male"].keys()))
-    else:
+    elif selected_voice == "Female":
         voice_final = st.selectbox("Female Characters", list(voices_by_gender["Female"].keys()))
     if st.button("Generate Voice"):
         if content_prompt.strip() in ("", "Generated prompt"):
@@ -415,7 +416,7 @@ def page_2():
             with st.spinner("Generating your voice..."):
                 filename = "voice.mp3"
                 # Run the async function properly
-                voice_arranged = voices_by_gender[selected_voice][voice_final]["ShortName"]
+                voice_arranged = voice_final[selected_voice][voice_final]["ShortName"]
                 asyncio.run(text_to_speech(content_prompt, filename,voice_arranged))
                 # Open the saved file and pass bytes to st.audio
                 with open(filename, "rb") as f:
