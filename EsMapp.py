@@ -483,7 +483,6 @@ def page_3():
         st.chat_message("user").write(prompt_ai)
         response = ai_assistant(prompt_ai)
         msg = response
-        st.session_state.messages.append({"role": "assistant", "content": msg})
         st.chat_message("assistant").write(msg)
 
 
