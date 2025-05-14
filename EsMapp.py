@@ -118,7 +118,7 @@ def page_2():
     st.title("Page 2")
 
 
-pg = st.navigation([st.Page(page_1(), title = "Essay Maker"), st.Page(page_2(), title = "Text To Speech")])
+pg = st.navigation([st.Page(page_1, title = "Essay Maker"), st.Page(page_2, title = "Text To Speech")])
 pg.run()
 
 
