@@ -466,8 +466,8 @@ def page_3():
             st.error(f"Failed to generate response: {str(det)}")
             return None
 
-    st.title("💬 Chatbot")
-    st.caption("AITO")
+    st.title("AITO")
+    st.caption("AI TOol for General Purpose")
 
     # Initialize chat history
     if "messages" not in st.session_state:
