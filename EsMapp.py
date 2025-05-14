@@ -102,10 +102,10 @@ def main():
                     full_prompt = f"Write a comprehensive {essay_type} education level: {level_essay}  type of speech: {speech_type} number of maximum words: {word_num} essay about: {content_prompt}. With extra task {other_info_prompt}"
                     essay = ai_assistant(full_prompt)
                     if essay:
-                        right.text_area("Generated Essay", value=essay, height=500)
+                        right.text_area("Generated Essay", value=essay, height=700)
 
         else:
-            right.text_area("Generated Essay", "", height=500)
+            right.text_area("Generated Essay", "", height=700)
 
 
 if __name__ == "__main__":
