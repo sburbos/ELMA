@@ -54,6 +54,7 @@ list_level = ["Elementary", "Junior High", "Senior High", "Undergraduate", "Grad
 list_speech_type = ["Casual", "Intimate", "Formal", "Frozen", "Consultative"]
 left, right = st.columns(2, vertical_alignment="top")
 
+
 def ai_assistant(prompt):
     try:
         response = client.chat.completions.create(
@@ -88,7 +89,8 @@ def main():
         level_essay = left.selectbox("Type-Level", list_level)
         speech_type = left.selectbox("Type of Speech", list_speech_type)
         essay_type = left.selectbox("Essay Type", list_essay_type)
-        word_num = left.slider("Select Number Words", min_value=0, max_value=10000, step=100)
+        word_num = left.slider("Select Number Words", min_value=0, max_value=1500, step=100)
+        selected_pov = left.segmented_control('Point of View', ['First', 'Second', 'Third'], selections_mode = "single")
 
     with st.container():
         content_prompt = left.text_area("Prompt", "Write your prompt here:", height=150)
@@ -99,13 +101,13 @@ def main():
                 st.warning("Please enter a valid prompt")
             else:
                 with st.spinner("Generating your essay..."):
-                    full_prompt = f"Write a comprehensive {essay_type} education level: {level_essay}  type of speech: {speech_type} number of minimum words: {word_num} essay about: {content_prompt}. With extra task {other_info_prompt}"
+                    full_prompt = f"Write a comprehensive {essay_type} point of view: {selected_pov} education level: {level_essay}  type of speech: {speech_type} number of minimum words: {word_num} essay about: {content_prompt}. With extra task {other_info_prompt}"
                     essay = ai_assistant(full_prompt)
                     if essay:
-                        right.text_area("Generated Essay", value=essay, height=630)
+                        right.text_area("Generated Essay", value=essay, height=680)
 
         else:
-            right.text_area("Generated Essay", "", height=630)
+            right.text_area("Generated Essay", "", height=680)
 
 
 if __name__ == "__main__":
