@@ -60,10 +60,10 @@ def page_1():
 
     languages = ["English (US)", "Filipino", "Hindi" ]
 
-    content_list_category = ["Facebook", "Youtube", "Tiktok", "Twitter/X", "Reddit", 'Instagram', "Spotify"]
-    content_list_content = ["Vlog", "Blog", "Written Post", "Podcast", "Music", "Article"]
-    content_list_complexity = ["Micro-Content", "Standard Content", "Premium Content", "Enterprise Content", "Legacy Content"]
-    content_list_tiers = ["Beginner", "Intermediate", "Advanced", "Expert"]
+    content_list_category = ["Facebook", "Youtube", "Tiktok", "Twitter/X", "Reddit", 'Instagram', "Spotify",]
+    content_list_content = ["Vlog", "Blog", "Written Post", "Podcast", "Music", "Article",]
+    content_list_complexity = ["Micro-Content", "Standard Content", "Premium Content", "Enterprise Content", "Legacy Content",]
+    content_list_tiers = ["Beginner", "Intermediate", "Advanced", "Expert",]
     content_creator_types = [
         # YouTube/TikTok Types
         "The Guru",
@@ -90,7 +90,7 @@ def page_1():
         "The Trendsetter",
         "The Parodist",
         "The Nostalgist",
-        "The Minimalist"
+        "The Minimalist",
     ]
 
 
@@ -124,7 +124,7 @@ def page_1():
             left.title("Your Free Essay Maker Tool")
             right.subheader("")
             right.title("")
-            on = right.toggle("Activate Content Creation")
+        on = right.toggle("Activate Content Creation")
         if on:
             with st.container():
                 level_essay = left.selectbox("Type-Level", list_level)
