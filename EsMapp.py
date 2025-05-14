@@ -52,7 +52,7 @@ list_essay_type = [
 
 list_level = ["Elementary", "Junior High", "Senior High", "Undergraduate", "Graduate", "Postgraduate", "PhD", "Masters", "Doctorate"]
 list_speech_type = ["Casual", "Intimate", "Formal", "Frozen", "Consultative"]
-left,right = st.columns(2, vertical_alignment="center")
+left,center, right = st.columns(3, vertical_alignment="top")
 
 def ai_assistant(prompt):
     try:
@@ -79,8 +79,8 @@ def ai_assistant(prompt):
 # Main app interface
 def main():
     with st.container():
-        st.subheader("EsMa")
-        st.title("Your Free Essay Maker Tool")
+        left.subheader("EsMa")
+        left.title("Your Free Essay Maker Tool")
     with st.container():
         level_essay = left.selectbox("Type-Level", list_level)
         speech_type = left.selectbox("Type of Speech", list_speech_type)
@@ -88,8 +88,8 @@ def main():
         word_num = right.text_area("Number of Words", "500", height=70)
 
     with st.container():
-        content_prompt = st.text_area("Prompt", "Write your prompt here:", height=150)
-        other_info_prompt = st.text_area("Other Instructions", "Write your other istructions here: ", height=70)
+        content_prompt = center.text_area("Prompt", "Write your prompt here:", height=150)
+        other_info_prompt = center.text_area("Other Instructions", "Write your other istructions here: ", height=70)
 
         if st.button("Generate Essay"):
             if content_prompt.strip() in ("", "Write your prompt here:"):
