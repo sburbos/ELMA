@@ -188,7 +188,7 @@ def page_2():
     st.title("Free Online Text-To-Speech Tool ")
     content_prompt = st.text_area("Prompt", "", height=150)
     selected_voice = st.segmented_control('Point of View', ['Male', 'Female'], selection_mode="single")
-    voice_final = ""
+    voice_final = None
     if selected_voice == "Male":
         voice_final = st.selectbox("Male Characters", list(voices_by_gender["Male"].keys()))
     elif selected_voice == "Female":
