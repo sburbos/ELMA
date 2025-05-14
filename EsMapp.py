@@ -10,10 +10,6 @@ st.set_page_config(
     layout="wide"
 )
 # Debug: Show loaded secrets (remove after testing)
-st.write("Secrets keys:", list(st.secrets.keys()))
-
-# Initialize client with multiple fallback options
-st.write("All secrets:", st.secrets)
 
 try:
     # Access nested secrets
