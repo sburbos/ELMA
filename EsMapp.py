@@ -117,7 +117,7 @@ def page_1():
 def page_2():
     st.title("Page 2")
 
-pg = st.navigation([page_1, page_2])
+pg = st.navigation([EsMapp, TeToS])
 pg.run()
 
 
