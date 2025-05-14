@@ -90,7 +90,7 @@ def main():
         speech_type = left.selectbox("Type of Speech", list_speech_type)
         essay_type = left.selectbox("Essay Type", list_essay_type)
         word_num = left.slider("Select Number Words", min_value=0, max_value=1500, step=100)
-        selected_pov = left.segmented_control('Point of View', ['First', 'Second', 'Third'], selections_mode = "single")
+        selected_pov = left.segmented_control('Point of View', ['First', 'Second', 'Third'], selection_mode = "single")
 
     with st.container():
         content_prompt = left.text_area("Prompt", "Write your prompt here:", height=150)
