@@ -1,7 +1,8 @@
 import streamlit as st
 import os
 from openai import OpenAI
-
+import edge_tts
+import asyncio
 # Initialize the OpenAI client with proper configuration
 
 st.set_page_config(
@@ -114,8 +115,21 @@ def page_1():
     if __name__ == "__main__":
         main()
 
+
+
+async def text_to_speech(text, filename):
+    communicate = edge_tts.Communicate(text, "ja-JP-NanamiNeural")
+    await communicate.save(filename)
+
+
+
 def page_2():
-    st.title("Page 2")
+    left.subheader("TeTos by Elley")
+    st.title("Free Online Text-To-Speech Tool ")
+    content_prompt = st.text_area("Prompt", "", height=150)
+    filename = "voice.mp3"
+    file =  asyncio.run(text_to_speech(content_prompt, filename))
+    st.audio(file, format="audio/mpeg", loop=True)
 
 
 pg = st.navigation([st.Page(page_1, title = "Essay Maker"), st.Page(page_2, title = "Text To Speech")])
