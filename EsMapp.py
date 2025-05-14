@@ -58,6 +58,41 @@ def page_1():
     list_speech_type = ["Casual", "Intimate", "Formal", "Frozen", "Consultative"]
     left, right = st.columns(2, vertical_alignment="top")
 
+    languages = ["English (US)", "Filipino", "Hindi" ]
+
+    content_list_category = ["Facebook", "Youtube", "Tiktok", "Twitter/X", "Reddit", 'Instagram', "Spotify"]
+    content_list_content = ["Vlog", "Blog", "Written Post", "Podcast", "Music", "Article"]
+    content_list_complexity = ["Micro-Content", "Standard Content", "Premium Content", "Enterprise Content", "Legacy Content"]
+    content_list_tiers = ["Beginner", "Intermediate", "Advanced", "Expert"]
+    content_creator_types = [
+        # YouTube/TikTok Types
+        "The Guru",
+        "The Everyman",
+        "The Mad Scientist",
+        "The Storyteller",
+        "The Entertainer",
+
+        # Educational Content Types
+        "The Professor",
+        "The Simplifier",
+        "The Debunker",
+        "The Coach",
+
+        # Fiction/Narrative Types
+        "The Hero",
+        "The Mentor",
+        "The Trickster",
+        "The Villain",
+
+        # Additional Digital Types
+        "The Reactor",
+        "The Investigator",
+        "The Trendsetter",
+        "The Parodist",
+        "The Nostalgist",
+        "The Minimalist"
+    ]
+
 
     def ai_assistant(prompt):
         try:
@@ -66,8 +101,8 @@ def page_1():
                 messages=[
                     {
                         "role": "system",
-                        "content": """You are EsMa (Essay Maker). Strictly only write the requested essay content. 
-                        Do not write any other information. Meaning, only write paragraphs. Also the output must have be clear and specific with no vague output"""
+                        "content": """You are EsMa. Strictly only write the requested essay content or content creation scripts. 
+                        Do not write any other information. Meaning, only write paragraphs (unless user chose content creation). Also the output must have be clear and specific with no vague output"""
                     },
                     {
                         "role": "user",
@@ -89,29 +124,61 @@ def page_1():
             left.title("Your Free Essay Maker Tool")
             right.subheader("")
             right.title("")
-        with st.container():
-            level_essay = left.selectbox("Type-Level", list_level)
-            speech_type = left.selectbox("Type of Speech", list_speech_type)
-            essay_type = left.selectbox("Essay Type", list_essay_type)
-            word_num = left.slider("Select Number Words", min_value=0, max_value=1500, step=100)
-            selected_pov = left.segmented_control('Point of View', ['First', 'Second', 'Third'], selection_mode = "single")
+            on = right.toggle("Activate Content Creation")
+        if on:
+            with st.container():
+                level_essay = left.selectbox("Type-Level", list_level)
+                speech_type = left.selectbox("Type of Speech", list_speech_type)
+                essay_type = left.selectbox("Essay Type", list_essay_type)
+                speech = left.selectbox("Select Language", languages)
+                word_num = left.slider("Select Number Words", min_value=0, max_value=1500, step=100)
+                selected_pov = left.segmented_control('Point of View', ['First', 'Second', 'Third'], selection_mode = "single")
 
-        with st.container():
-            content_prompt = left.text_area("Prompt", "", height=150)
-            other_info_prompt = left.text_area("Other Instructions", "", height=70)
+            with st.container():
+                content_prompt = left.text_area("Prompt", "", height=150)
+                other_info_prompt = left.text_area("Other Instructions", "", height=70)
 
-            if st.button("Generate Essay"):
-                if content_prompt.strip() in ("", "Generated prompt"):
-                    st.warning("Please enter a valid prompt")
+                if st.button("Generate Essay"):
+                    if content_prompt.strip() in ("", "Generated prompt"):
+                        st.warning("Please enter a valid prompt")
+                    else:
+                        with st.spinner("Generating your essay..."):
+                            full_prompt = f"Write a comprehensive {essay_type}, point of view: {selected_pov} point of view, education level: {level_essay}, language to use:{speech},  type of speech: {speech_type}, number of minimum words: {word_num}, essay about: {content_prompt}. With extra task {other_info_prompt}"
+                            essay = ai_assistant(full_prompt)
+                            if essay:
+                                right.text_area("Generated Essay", value=essay, height=680)
+
                 else:
-                    with st.spinner("Generating your essay..."):
-                        full_prompt = f"Write a comprehensive {essay_type}, point of view: {selected_pov} point of view, education level: {level_essay},  type of speech: {speech_type}, number of minimum words: {word_num}, essay about: {content_prompt}. With extra task {other_info_prompt}"
-                        essay = ai_assistant(full_prompt)
-                        if essay:
-                            right.text_area("Generated Essay", value=essay, height=680)
+                    right.text_area("Generated Essay", "", height=680)
+        else:
+            with st.container():
+                content_place = left.selectbox("Where to Post?", content_list_category)
+                content_type = left.selectbox("Type of Content", content_list_content)
+                content_complexity = left.selectbox("Content Complexity", content_list_complexity)
+                content_tier = left.selectbox("Content Tier", content_list_tiers)
+                selected_character = left.segmented_control('Point of View', content_creator_types, selection_mode="single")
 
-            else:
-                right.text_area("Generated Essay", "", height=680)
+            with st.container():
+                content_prompt = left.text_area("Prompt", "", height=150)
+                other_info_prompt = left.text_area("Other Instructions", "", height=70)
+
+                if st.button("Generate Essay"):
+                    if content_prompt.strip() in ("", "Generated prompt"):
+                        st.warning("Please enter a valid prompt")
+                    else:
+                        with st.spinner("Generating your essay..."):
+                            full_prompt = f"""Write a content about: {content_prompt} that will be posted or used in: {content_place}
+                            having a content type: {content_type}, having a content complexity: {content_complexity}, having a content tier for: {content_tier}
+                            and will portray a character: {selected_character}. With extra task {other_info_prompt}
+                                                
+"""
+                            content_out = ai_assistant(full_prompt)
+                            if content_out:
+                                right.text_area("Generated Content", value=content_out, height=680)
+
+                else:
+                    right.text_area("Generated Content", "", height=680)
+
 
 
     if __name__ == "__main__":
