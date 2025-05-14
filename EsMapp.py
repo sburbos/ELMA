@@ -124,7 +124,7 @@ async def text_to_speech(text, filename):
 
 
 def page_2():
-    left.subheader("TeTos by Elley")
+    st.subheader("TeTos by Elley")
     st.title("Free Online Text-To-Speech Tool ")
     content_prompt = st.text_area("Prompt", "", height=150)
     filename = "voice.mp3"
