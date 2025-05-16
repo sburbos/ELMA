@@ -812,7 +812,7 @@ def pdf2quiz():
 
     # File uploader for both PDF and PPTX
     uploaded_file = st.file_uploader("Upload File", type=["pdf", "pptx"])
-    toggle_swap = st.toggle("Custom or Additional Prompt", true)
+    toggle_swap = st.toggle("Custom or Additional Prompt")
 
 
     if uploaded_file or toggle_swap:
