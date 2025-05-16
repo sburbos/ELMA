@@ -1,6 +1,5 @@
 import streamlit as st
 import tempfile
-
 from attr import NothingType
 from openai import OpenAI
 import edge_tts
@@ -8,6 +7,7 @@ import asyncio
 import PyPDF2
 from io import StringIO
 import ast
+from streamlit.components.v1 import html
 # Initialize the OpenAI client with proper configuration
 
 st.set_page_config(
@@ -16,7 +16,151 @@ st.set_page_config(
     layout="wide"
 )
 def main_page():
-    st.title("Lley AI-powered tools")
+    st.markdown("""
+    <style>
+        /* Remove default Streamlit elements */
+        .stApp {
+            background: #000000;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
+        /* Main container */
+        .main-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(-45deg, #000000, #111111, #222222, #000000);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            color: white;
+        }
+
+        /* Background animation */
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Name animation */
+        @keyframes glow {
+            0% { text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #0073e6, 0 0 20px #0073e6; }
+            50% { text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #0073e6, 0 0 40px #0073e6; }
+            100% { text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #0073e6, 0 0 20px #0073e6; }
+        }
+
+        /* Letter animations */
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        /* Name styling */
+        .name {
+            font-family: 'Arial', sans-serif;
+            font-size: 8rem;
+            font-weight: 700;
+            animation: glow 3s ease-in-out infinite;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Individual letter styling */
+        .letter {
+            display: inline-block;
+            animation: float 4s ease-in-out infinite;
+        }
+
+        /* Different delays for each letter */
+        .l1 { animation-delay: 0.1s; }
+        .l2 { animation-delay: 0.2s; }
+        .e { animation-delay: 0.3s; }
+        .y { animation-delay: 0.4s; }
+
+        /* Subtle footer */
+        .footer {
+            position: absolute;
+            bottom: 20px;
+            color: rgba(255,255,255,0.3);
+            font-size: 0.8rem;
+            animation: fadeIn 5s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .name {
+                font-size: 4rem;
+            }
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # JavaScript for additional effects
+    def add_js():
+        html("""
+        <script>
+        // Mouse move parallax effect
+        document.addEventListener('mousemove', function(e) {
+            const letters = document.querySelectorAll('.letter');
+            const x = e.clientX / window.innerWidth;
+            const y = e.clientY / window.innerHeight;
+
+            letters.forEach((letter, index) => {
+                const offset = (index + 1) * 10;
+                letter.style.transform = `translate(${(x - 0.5) * offset}px, ${(y - 0.5) * offset}px)`;
+            });
+        });
+
+        // Click ripple effect
+        document.addEventListener('click', function(e) {
+            const ripple = document.createElement('div');
+            ripple.style.position = 'absolute';
+            ripple.style.width = '20px';
+            ripple.style.height = '20px';
+            ripple.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
+            ripple.style.borderRadius = '50%';
+            ripple.style.pointerEvents = 'none';
+            ripple.style.left = `${e.clientX - 10}px`;
+            ripple.style.top = `${e.clientY - 10}px`;
+            ripple.style.transform = 'scale(0)';
+
+            document.body.appendChild(ripple);
+
+            setTimeout(() => {
+                ripple.style.transition = 'transform 0.5s ease-out, opacity 0.5s ease-out';
+                ripple.style.transform = 'scale(20)';
+                ripple.style.opacity = '0';
+
+                setTimeout(() => {
+                    ripple.remove();
+                }, 500);
+            }, 10);
+        });
+        </script>
+        """)
+
+    add_js()
+
+    # Main content - just the name with animated letters
+    st.markdown("""
+    <div class="main-container">
+        <h1 class="name">
+            <span class="letter l1">L</span>
+            <span class="letter l2">L</span>
+            <span class="letter e">e</span>
+            <span class="letter y">y</span>
+        </h1>
+        <div class="footer">experience the future</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 
@@ -814,10 +958,10 @@ def pdf2quiz():
 def about():
     st.title("About")
 
-pages={ "Tools": [st.Page(main_page, title="Home"), st.Page(esma, title="Essay Maker"),
-              st.Page(tetos, title="Text To Speech"),
-              st.Page(aito, title="AITO"),
-              st.Page(pdf2quiz, title="Pdf to Quiz")],
+pages={ "Tools": [st.Page(main_page, title="Home"), st.Page(aito, title="AITO"),
+                  st.Page(esma, title="Essay Maker"),
+                  st.Page(tetos, title="Text To Speech"),
+                  st.Page(pdf2quiz, title="Pdf To Quiz")],
         "About": [st.Page(about, title="About")],
 
         }
