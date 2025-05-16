@@ -655,6 +655,7 @@ def page_4():
 
     # Generate quiz button
     if pdf_file and (pdf_file != st.session_state.quiz['file_processed'] or st.session_state.quiz['data'] is None):
+        number_quiz = st.number_input("Insert a number", min_value = 1, max_value = 100, value=5, placeholder="Type a number...")
         if st.button("Generate Quiz"):
             with st.spinner("Generating quiz from PDF..."):
                 # Save uploaded file to temp file
@@ -668,7 +669,7 @@ def page_4():
                 if pdf_text and pdf_text != "No text could be extracted from the PDF.":
                     # Generate quiz from text
                     full_prompt = f"""Create a multiple choice quiz based on the following text. 
-                    Generate 15 good-quality questions that test understanding of key concepts.
+                    Generate {number_quiz} good quality questions that test understanding of key concepts.
                     For each question, provide 4 plausible options (a-d) and indicate the correct answer.
                     Return ONLY the Python dictionary in the specified format.
 
