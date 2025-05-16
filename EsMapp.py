@@ -9,6 +9,7 @@ from io import StringIO
 from streamlit_lottie import st_lottie
 import json
 import ast
+import random
 
 # Initialize the OpenAI client with proper configuration
 
@@ -19,20 +20,193 @@ st.set_page_config(
 )
 st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 def main_page():
-    with open("4kvid.mp4.lottie.json", "r") as f:
-        lottie_json = json.load(f)
+    st.markdown("""
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@700&display=swap');
 
-    # Display the animation
-    st_lottie(
-        lottie_json,
-        speed=1,
-        loop=True,
-        quality="high",
-        height=300,
-        width=300,
-        key="home_animation"
-    )
+        /* Base styling */
+        html, body, .stApp {
+            overflow: hidden !important;
+            height: 100vh;
+            width: 100vw;
+            margin: 0;
+            padding: 0;
+            background: #000;
+        }
 
+        /* Main container */
+        .futur-container {
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+
+        /* Futuristic text */
+        .futur-text {
+            font-family: 'Chakra Petch', sans-serif;
+            font-size: 8rem;
+            font-weight: 700;
+            color: transparent;
+            background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            position: relative;
+            text-transform: uppercase;
+            letter-spacing: 0.5rem;
+        }
+
+        /* Holographic effect */
+        .futur-text::before {
+            content: 'Lley';
+            position: absolute;
+            top: 0;
+            left: 0;
+            color: transparent;
+            background: linear-gradient(90deg, #ff00cc 0%, #333399 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            z-index: -1;
+            animation: hologram 3s ease-in-out infinite alternate;
+        }
+
+        @keyframes hologram {
+            0% { transform: translate(0, 0); opacity: 0.8; }
+            25% { transform: translate(5px, 2px); }
+            50% { transform: translate(-3px, 4px); }
+            75% { transform: translate(2px, -3px); }
+            100% { transform: translate(-5px, 1px); opacity: 0.3; }
+        }
+
+        /* Grid lines animation */
+        .grid-line {
+            position: absolute;
+            background: rgba(0, 210, 255, 0.1);
+            animation: grid-fade 6s ease-in-out infinite;
+        }
+
+        @keyframes grid-fade {
+            0%, 100% { opacity: 0.05; }
+            50% { opacity: 0.2; }
+        }
+
+        /* Digital particles */
+        .particle {
+            position: absolute;
+            color: #00d2ff;
+            font-family: monospace;
+            animation: particle-fall linear infinite;
+            opacity: 0;
+        }
+
+        @keyframes particle-fall {
+            0% { transform: translateY(-100vh); opacity: 0; }
+            10% { opacity: 0.8; }
+            90% { opacity: 0.8; }
+            100% { transform: translateY(100vh); opacity: 0; }
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .futur-text {
+                font-size: 4rem;
+                letter-spacing: 0.3rem;
+            }
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # JavaScript for advanced effects
+    html("""
+    <script>
+        // Create grid lines
+        function createGrid() {
+            const container = document.querySelector('.futur-container');
+            const lineCount = 20;
+
+            // Vertical lines
+            for (let i = 0; i < lineCount; i++) {
+                const line = document.createElement('div');
+                line.classList.add('grid-line');
+                line.style.width = '1px';
+                line.style.height = '100vh';
+                line.style.left = `${(i / lineCount) * 100}vw`;
+                line.style.animationDelay = `${Math.random() * 6}s`;
+                container.appendChild(line);
+            }
+
+            // Horizontal lines
+            for (let i = 0; i < lineCount; i++) {
+                const line = document.createElement('div');
+                line.classList.add('grid-line');
+                line.style.width = '100vw';
+                line.style.height = '1px';
+                line.style.top = `${(i / lineCount) * 100}vh`;
+                line.style.animationDelay = `${Math.random() * 6}s`;
+                container.appendChild(line);
+            }
+        }
+
+        // Create digital particles
+        function createParticles() {
+            const container = document.querySelector('.futur-container');
+            const particleCount = 30;
+            const chars = ['0', '1', '⎔', '⊞', '⎅', '⌾', '⍟'];
+
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.classList.add('particle');
+                particle.textContent = chars[Math.floor(Math.random() * chars.length)];
+
+                // Random properties
+                const left = Math.random() * 100;
+                const duration = 5 + Math.random() * 10;
+                const delay = Math.random() * 15;
+                const size = 10 + Math.random() * 20;
+                const blur = Math.random() * 3;
+
+                particle.style.left = `${left}vw`;
+                particle.style.fontSize = `${size}px`;
+                particle.style.filter = `blur(${blur}px)`;
+                particle.style.animationDuration = `${duration}s`;
+                particle.style.animationDelay = `${delay}s`;
+
+                container.appendChild(particle);
+            }
+        }
+
+        // Initialize effects
+        document.addEventListener('DOMContentLoaded', function() {
+            createGrid();
+            createParticles();
+
+            // Disable scrolling
+            window.scrollTo(0, 0);
+            document.body.style.overflow = 'hidden';
+
+            // Prevent touch scrolling
+            document.addEventListener('touchmove', function(e) {
+                e.preventDefault();
+            }, { passive: false });
+        });
+
+        // Lock scroll position
+        document.addEventListener('scroll', function() {
+            window.scrollTo(0, 0);
+        });
+    </script>
+    """)
+
+    # Futuristic Lley display
+    st.markdown("""
+    <div class="futur-container">
+        <div class="futur-text">Lley</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Debug: Show loaded secrets (remove after testing)
 
