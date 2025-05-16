@@ -7,7 +7,8 @@ import asyncio
 import PyPDF2
 from io import StringIO
 import ast
-import random
+from streamlit.components.v1 import html
+import math
 
 # Initialize the OpenAI client with proper configuration
 
@@ -22,7 +23,7 @@ def main_page():
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@700&display=swap');
 
-        /* Reset all margins and padding */
+        /* Remove all default margins/padding */
         html, body, .stApp {
             overflow: hidden !important;
             height: 100vh !important;
@@ -32,8 +33,8 @@ def main_page():
             background: #000 !important;
         }
 
-        /* Create a centered container */
-        .centered-container {
+        /* Centered container */
+        .center-container {
             position: fixed;
             top: 0;
             left: 0;
@@ -44,63 +45,90 @@ def main_page():
             align-items: center;
         }
 
-        /* Futuristic text styling */
-        .futur-text {
+        /* Main text styling */
+        .main-text {
             font-family: 'Chakra Petch', sans-serif;
-            font-size: clamp(3rem, 10vw, 8rem); /* Responsive font size */
+            font-size: clamp(3rem, 10vw, 8rem);
             font-weight: 700;
-            color: #00d2ff;
+            color: #ff1493; /* Reddish pink */
             text-transform: uppercase;
             letter-spacing: 0.5rem;
-            text-shadow: 0 0 10px rgba(0, 210, 255, 0.7);
-            animation: pulse 3s ease-in-out infinite;
             text-align: center;
-            margin: 0;
-            padding: 0;
+            position: relative;
+            z-index: 2;
         }
 
-        /* Simple pulse animation */
-        @keyframes pulse {
-            0%, 100% { 
-                opacity: 0.9; 
-                text-shadow: 0 0 10px rgba(0, 210, 255, 0.7); 
-            }
-            50% { 
-                opacity: 1; 
-                text-shadow: 0 0 20px rgba(0, 210, 255, 0.9), 
-                             0 0 30px rgba(0, 210, 255, 0.5); 
-            }
-        }
-
-        /* Grid background effect */
-        .grid-bg {
-            position: fixed;
+        /* Orbiting circles container */
+        .orbit-container {
+            position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-image: 
-                linear-gradient(rgba(0, 210, 255, 0.1) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0, 210, 255, 0.1) 1px, transparent 1px);
-            background-size: 50px 50px;
-            z-index: -1;
-            animation: grid-move 100s linear infinite;
+            pointer-events: none;
         }
 
-        @keyframes grid-move {
-            from { background-position: 0 0; }
-            to { background-position: 1000px 1000px; }
+        /* Circle styling */
+        .orbiting-circle {
+            position: absolute;
+            border-radius: 50%;
+            background: transparent;
+            border: 2px solid #ff69b4;
+            filter: drop-shadow(0 0 5px #ff1493);
         }
     </style>
     """, unsafe_allow_html=True)
 
-    # Background grid
-    st.markdown('<div class="grid-bg"></div>', unsafe_allow_html=True)
+    # JavaScript for orbiting circles animation
+    html("""
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const container = document.querySelector('.orbit-container');
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
 
-    # Centered content
+            // Create 8 orbiting circles with different properties
+            for (let i = 0; i < 8; i++) {
+                const circle = document.createElement('div');
+                circle.className = 'orbiting-circle';
+
+                // Different sizes and speeds
+                const size = 20 + (i * 10);
+                const radius = 100 + (i * 50);
+                const speed = 0.0005 + (i * 0.0001);
+                const angleOffset = (i * Math.PI) / 4;
+
+                circle.style.width = `${size}px`;
+                circle.style.height = `${size}px`;
+                circle.style.borderWidth = `${1 + (i * 0.3)}px`;
+
+                // Animation loop
+                let angle = 0;
+                function animate() {
+                    angle += speed;
+                    const x = centerX + Math.cos(angle + angleOffset) * radius;
+                    const y = centerY + Math.sin(angle + angleOffset) * radius;
+                    circle.style.left = `${x - size/2}px`;
+                    circle.style.top = `${y - size/2}px`;
+                    requestAnimationFrame(animate);
+                }
+
+                container.appendChild(circle);
+                animate();
+            }
+
+            // Disable scrolling
+            document.body.style.overflow = 'hidden';
+            window.addEventListener('scroll', () => window.scrollTo(0, 0));
+        });
+    </script>
+    """)
+
+    # Page structure
     st.markdown("""
-    <div class="centered-container">
-        <div class="futur-text">Lley</div>
+    <div class="center-container">
+        <div class="orbit-container"></div>
+        <div class="main-text">Lley</div>
     </div>
     """, unsafe_allow_html=True)
 # Debug: Show loaded secrets (remove after testing)
