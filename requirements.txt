@@ -3,6 +3,5 @@ openai
 python-pptx
 edge-tts
 PyPDF2
-math
 python-dotenv>=1.0.0
 requests
