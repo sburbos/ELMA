@@ -632,112 +632,137 @@ def page_4():
                     }
                 ],
                 max_tokens=20000,
-                temperature=0.3  # Lower temperature for more deterministic output
+                temperature=0.3
             )
             return response.choices[0].message.content
         except Exception as det:
             st.error(f"Failed to generate quiz: {str(det)}")
             return None
 
+    # Initialize session state
+    if 'quiz' not in st.session_state:
+        st.session_state.quiz = {
+            'data': None,
+            'answers': {},
+            'submitted': False,
+            'file_processed': None
+        }
+
     st.title("PDF to Quiz")
 
-    with st.container():
-        file = st.file_uploader("Select a PDF File", type=["pdf"], accept_multiple_files=False)
+    # File uploader
+    pdf_file = st.file_uploader("Upload PDF", type="pdf")
 
-        if file is not None:
-            # Display PDF info
-            st.write(f"File uploaded: {file.name} ({file.size / 1024 / 1024:.2f} MB)")
+    # Generate quiz button
+    if pdf_file and (pdf_file != st.session_state.quiz['file_processed'] or st.session_state.quiz['data'] is None):
+        if st.button("Generate Quiz"):
+            with st.spinner("Generating quiz from PDF..."):
+                # Save uploaded file to temp file
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                    tmp_file.write(pdf_file.getvalue())
+                    tmp_file_path = tmp_file.name
 
-            if st.button("Generate Quiz"):
-                with st.spinner("Processing PDF and generating quiz..."):
-                    # Save uploaded file to temp file
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-                        tmp_file.write(file.getvalue())
-                        tmp_file_path = tmp_file.name
+                # Extract text from PDF
+                pdf_text = pdf_file_extractor(tmp_file_path)
 
-                    # Extract text from PDF
-                    pdf_text = pdf_file_extractor(tmp_file_path)
+                if pdf_text and pdf_text != "No text could be extracted from the PDF.":
+                    # Generate quiz from text
+                    full_prompt = f"""Create a multiple choice quiz based on the following text. 
+                    Generate 5-10 good quality questions that test understanding of key concepts.
+                    For each question, provide 4 plausible options (a-d) and indicate the correct answer.
+                    Return ONLY the Python dictionary in the specified format.
 
-                    if pdf_text and pdf_text != "No text could be extracted from the PDF.":
-                        full_prompt = f"""Create a multiple choice quiz based on the following text. 
-                        Generate 5-10 good quality questions that test understanding of key concepts.
-                        For each question, provide 4 plausible options (a-d) and indicate the correct answer.
-                        Return ONLY the Python dictionary in the specified format.
+                    Text content:
+                    {pdf_text[:10000]}"""
 
-                        Text content:
-                        {pdf_text[:10000]}"""  # Limit to first 10k chars to avoid token limits
+                    content_out = ai_assistant(full_prompt)
 
-                        content_out = ai_assistant(full_prompt)
+                    if content_out:
+                        try:
+                            # Clean the output
+                            clean_output = content_out.strip()
+                            if clean_output.startswith("```python"):
+                                clean_output = clean_output[9:]
+                            if clean_output.startswith("```"):
+                                clean_output = clean_output[3:]
+                            if clean_output.endswith("```"):
+                                clean_output = clean_output[:-3]
 
-                        if content_out:
-                            try:
-                                # Clean the output by removing markdown code blocks if present
-                                clean_output = content_out.strip()
-                                if clean_output.startswith("```python"):
-                                    clean_output = clean_output[9:]
-                                if clean_output.startswith("```"):
-                                    clean_output = clean_output[3:]
-                                if clean_output.endswith("```"):
-                                    clean_output = clean_output[:-3]
+                            # Convert to dictionary
+                            quiz_data = ast.literal_eval(clean_output)
 
-                                # Convert to dictionary
-                                dictionary_out = ast.literal_eval(clean_output)
+                            # Update session state
+                            st.session_state.quiz = {
+                                'data': quiz_data,
+                                'answers': {q_num: None for q_num in quiz_data},
+                                'submitted': False,
+                                'file_processed': pdf_file
+                            }
+                            st.rerun()
 
-                                # Display quiz title
-                                st.subheader("Generated Quiz")
-                                st.write(f"Based on: {file.name}")
+                        except Exception as e:
+                            st.error(f"Error processing quiz: {str(e)}")
+                            st.text("Raw AI output:")
+                            st.code(content_out)
 
-                                # Initialize score tracking
-                                if 'score' not in st.session_state:
-                                    st.session_state.score = 0
-                                    st.session_state.answers = {}
+    # Display the quiz if generated
+    if st.session_state.quiz['data']:
+        st.subheader("Test Your Knowledge")
 
-                                # Display each question
-                                for q_num, question_data in dictionary_out.items():
-                                    st.markdown(f"**Question {q_num}**")
-                                    st.write(question_data["question"])
+        # Display each question
+        for q_num, question in st.session_state.quiz['data'].items():
+            st.write(f"**{q_num}. {question['question']}**")
 
-                                    # Create options list in correct order
-                                    options = [
-                                        question_data["a"],
-                                        question_data["b"],
-                                        question_data["c"],
-                                        question_data["d"]
-                                    ]
+            # Get current answer or None if not answered
+            current_answer = st.session_state.quiz['answers'].get(q_num)
 
-                                    # Display radio button
-                                    user_answer = st.radio(
-                                        label="Select your answer:",
-                                        options=options,
-                                        key=f"question_{q_num}",
-                                        index=None  # Start with no selection
-                                    )
+            # Show radio buttons
+            options = [question['a'], question['b'], question['c'], question['d']]
+            user_choice = st.radio(
+                "Select your answer:",
+                options,
+                key=f"q_{q_num}",
+                index=options.index(current_answer) if current_answer is not None else None
+            )
 
-                                    # Check answer when user selects one
-                                    if user_answer:
-                                        correct_answer = question_data[question_data["answer_key"]]
-                                        if user_answer == correct_answer:
-                                            st.session_state.score += 1
-                                            st.success("✓ Correct!")
-                                        else:
-                                            st.error(f"✗ Incorrect. The correct answer is: {correct_answer}")
-                                        st.session_state.answers[q_num] = (user_answer == correct_answer)
+            # Store answer if changed
+            if user_choice and user_choice != current_answer:
+                st.session_state.quiz['answers'][q_num] = user_choice
+                if not st.session_state.quiz['submitted']:
+                    st.rerun()
 
-                                # Display total score
-                                total_questions = len(dictionary_out)
-                                if st.session_state.answers and len(st.session_state.answers) == total_questions:
-                                    st.markdown(f"### Your score: {st.session_state.score}/{total_questions}")
+            # Show correct answer after submission
+            if st.session_state.quiz['submitted']:
+                correct_answer = question[question['answer_key']]
+                if st.session_state.quiz['answers'][q_num] == correct_answer:
+                    st.success("✓ Correct!")
+                else:
+                    st.error(f"Correct answer: {correct_answer}")
 
-                                # Show raw dictionary for debugging
-                                with st.expander("View raw quiz data"):
-                                    st.code(clean_output)
+        # Action buttons
+        col1, col2 = st.columns(2)
+        with col1:
+            if not st.session_state.quiz['submitted'] and any(st.session_state.quiz['answers'].values()):
+                if st.button("Submit Answers"):
+                    st.session_state.quiz['submitted'] = True
+                    st.rerun()
+        with col2:
+            if st.button("Reset Quiz"):
+                st.session_state.quiz = {
+                    'data': None,
+                    'answers': {},
+                    'submitted': False,
+                    'file_processed': None
+                }
+                st.rerun()
 
-                            except Exception as e:
-                                st.error(f"Error processing quiz: {str(e)}")
-                                st.text("Raw AI output:")
-                                st.code(content_out)
-                    else:
-                        st.warning("Could not extract text from the PDF or PDF was empty.")
+        # Calculate and display score if submitted
+        if st.session_state.quiz['submitted']:
+            score = sum(
+                1 for q_num, question in st.session_state.quiz['data'].items()
+                if st.session_state.quiz['answers'][q_num] == question[question['answer_key']]
+            )
+            st.success(f"Your score: {score}/{len(st.session_state.quiz['data'])}")
 
 
 
