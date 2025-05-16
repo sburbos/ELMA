@@ -18,96 +18,102 @@ st.set_page_config(
 )
 st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 def main_page():
-    try:
-        st.markdown("""
-        <style>
-            @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@700&display=swap');
+    st.markdown("""
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@700&display=swap');
 
-            body, .stApp {
-                overflow: hidden;
-                height: 100vh;
-                margin: 0;
-                padding: 0;
-                background: #000;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-            }
+        html, body, .stApp {
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            margin: 0;
+            padding: 0;
+            background: #000;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+        }
 
+        .main-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .futur-text {
+            font-family: 'Chakra Petch', sans-serif;
+            font-size: 8rem;
+            font-weight: 700;
+            color: #00d2ff;
+            text-transform: uppercase;
+            letter-spacing: 0.5rem;
+            text-shadow: 0 0 10px rgba(0, 210, 255, 0.7);
+            animation: pulse 3s ease-in-out infinite;
+            text-align: center;
+            margin: 0 auto;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.9; text-shadow: 0 0 10px rgba(0, 210, 255, 0.7); }
+            50% { opacity: 1; text-shadow: 0 0 20px rgba(0, 210, 255, 0.9); }
+        }
+
+        @media (max-width: 768px) {
             .futur-text {
-                font-family: 'Chakra Petch', sans-serif;
-                font-size: 8rem;
-                font-weight: 700;
-                color: #00d2ff;
-                text-transform: uppercase;
-                letter-spacing: 0.5rem;
-                text-shadow: 0 0 10px rgba(0, 210, 255, 0.7);
-                animation: pulse 3s ease-in-out infinite;
-                position: relative;
+                font-size: 4rem;
             }
+        }
+    </style>
+    """, unsafe_allow_html=True)
 
-            @keyframes pulse {
-                0%, 100% { opacity: 0.9; text-shadow: 0 0 10px rgba(0, 210, 255, 0.7); }
-                50% { opacity: 1; text-shadow: 0 0 20px rgba(0, 210, 255, 0.9); }
-            }
+    # Display centered content
+    st.markdown("""
+    <div class="main-container">
+        <div class="futur-text">Lley</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-            @media (max-width: 768px) {
-                .futur-text {
-                    font-size: 4rem;
-                }
-            }
-        </style>
-        """, unsafe_allow_html=True)
-
-        # Minimal JavaScript with error handling
-        try:
-            html("""
-            <script>
+    # JavaScript with error handling
+    try:
+        html("""
+        <script>
+            try {
                 // Disable scrolling
                 document.body.style.overflow = 'hidden';
                 window.addEventListener('scroll', function() {
                     window.scrollTo(0, 0);
                 });
 
-                // Simple cursor trail effect
+                // Simple cursor effect
                 document.addEventListener('mousemove', function(e) {
-                    const dot = document.createElement('div');
-                    dot.style.position = 'absolute';
-                    dot.style.width = '6px';
-                    dot.style.height = '6px';
-                    dot.style.backgroundColor = 'rgba(0, 210, 255, 0.5)';
-                    dot.style.borderRadius = '50%';
-                    dot.style.left = e.clientX + 'px';
-                    dot.style.top = e.clientY + 'px';
-                    dot.style.pointerEvents = 'none';
-                    dot.style.zIndex = '9999';
-                    document.body.appendChild(dot);
+                    const cursor = document.getElementById('custom-cursor') || document.createElement('div');
+                    cursor.id = 'custom-cursor';
+                    cursor.style.position = 'fixed';
+                    cursor.style.width = '20px';
+                    cursor.style.height = '20px';
+                    cursor.style.border = '2px solid rgba(0, 210, 255, 0.7)';
+                    cursor.style.borderRadius = '50%';
+                    cursor.style.left = (e.clientX - 10) + 'px';
+                    cursor.style.top = (e.clientY - 10) + 'px';
+                    cursor.style.pointerEvents = 'none';
+                    cursor.style.zIndex = '9999';
+                    cursor.style.transition = 'transform 0.1s ease';
+                    cursor.style.transform = 'scale(' + (1 + Math.random() * 0.3) + ')';
 
-                    // Fade out and remove
-                    setTimeout(() => {
-                        dot.style.transition = 'all 0.5s ease';
-                        dot.style.opacity = '0';
-                        dot.style.transform = 'scale(2)';
-                        setTimeout(() => dot.remove(), 500);
-                    }, 100);
+                    if (!document.getElementById('custom-cursor')) {
+                        document.body.appendChild(cursor);
+                    }
                 });
-            </script>
-            """)
-        except Exception as e:
-            st.error("Could not load interactive elements")
-            print(f"JavaScript error: {e}")
-
-        # Display the text
-        st.markdown('<div class="futur-text">Lley</div>', unsafe_allow_html=True)
-
+            } catch(e) {
+                console.log('JavaScript error:', e);
+            }
+        </script>
+        """)
     except Exception as e:
-        st.error("An error occurred while rendering the page")
-        print(f"Rendering error: {e}")
-        st.markdown("""
-        <div style="font-family: sans-serif; color: white; text-align: center;">
-            <h1>Lley</h1>
-        </div>
-        """, unsafe_allow_html=True)
+        st.error("Interactive elements could not load")
+        print(f"JavaScript execution error: {e}")
 # Debug: Show loaded secrets (remove after testing)
 
 def esma():
