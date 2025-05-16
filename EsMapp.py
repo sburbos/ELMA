@@ -50,7 +50,7 @@ def main_page():
             font-family: 'Chakra Petch', sans-serif;
             font-size: clamp(3rem, 10vw, 8rem);
             font-weight: 700;
-            color: #ff1493; /* Reddish pink */
+            color: #ff6a6a; /* Reddish pink */
             text-transform: uppercase;
             letter-spacing: 0.5rem;
             text-align: center;
@@ -80,7 +80,7 @@ def main_page():
     """, unsafe_allow_html=True)
 
     # JavaScript for orbiting circles animation
-    html("""
+    st.html("""
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const container = document.querySelector('.orbit-container');
