@@ -6,6 +6,8 @@ import edge_tts
 import asyncio
 import PyPDF2
 from io import StringIO
+from streamlit_lottie import st_lottie
+import json
 import ast
 
 # Initialize the OpenAI client with proper configuration
