@@ -9,10 +9,13 @@ import ast
 # Initialize the OpenAI client with proper configuration
 
 st.set_page_config(
-    page_title="EsMa",
+    page_title="Lley",
     page_icon=":writing_hand:",
     layout="wide"
 )
+def main_page():
+    st.title("Lley AI-powered tools")
+
 
 
 # Debug: Show loaded secrets (remove after testing)
@@ -651,7 +654,7 @@ def pdf2quiz():
     st.title("PDF to Quiz")
 
     # File uploader
-    pdf_file = st.file_uploader("Upload PDF", type="pdf")
+    pdf_file = st.file_uploader("Upload PDF", type="pdf" and "pptx")
 
     # Generate quiz button
     if pdf_file and (pdf_file != st.session_state.quiz['file_processed'] or st.session_state.quiz['data'] is None):
@@ -767,7 +770,7 @@ def pdf2quiz():
 
 
 pg = st.navigation(
-    [st.Page(esma, title="Essay Maker"), st.Page(tetos, title="Text To Speech"), st.Page(aito, title="AITO"),st.Page(pdf2quiz, title="pdf to quiz") ])
+    [st.Page(esma, title="Essay Maker"), st.Page(tetos, title="Text To Speech"), st.Page(aito, title="AITO"),st.Page(pdf2quiz, title="Pdf to Quiz") ])
 pg.run()
 
 
