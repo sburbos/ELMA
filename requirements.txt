@@ -3,5 +3,6 @@ openai
 python-pptx
 edge-tts
 PyPDF2
+streamlit-lottie
 python-dotenv>=1.0.0
 requests
