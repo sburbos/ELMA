@@ -66,6 +66,7 @@ def main_page():
             width: 100%;
             height: 100%;
             pointer-events: none;
+            overflow: hidden;
         }
 
         /* Circle styling */
@@ -75,59 +76,61 @@ def main_page():
             background: transparent;
             border: 2px solid #ff69b4;
             filter: drop-shadow(0 0 5px #ff1493);
+            transform-origin: center center;
         }
     </style>
     """, unsafe_allow_html=True)
 
     # JavaScript for orbiting circles animation
-    st.html("""
+    html("""
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const container = document.querySelector('.orbit-container');
-            const centerX = window.innerWidth / 2;
-            const centerY = window.innerHeight / 2;
+    (function() {
+        const container = document.createElement('div');
+        container.className = 'orbit-container';
+        document.querySelector('.center-container').prepend(container);
 
-            // Create 8 orbiting circles with different properties
-            for (let i = 0; i < 8; i++) {
-                const circle = document.createElement('div');
-                circle.className = 'orbiting-circle';
+        const centerX = window.innerWidth / 2;
+        const centerY = window.innerHeight / 2;
 
-                // Different sizes and speeds
-                const size = 20 + (i * 10);
-                const radius = 100 + (i * 50);
-                const speed = 0.0005 + (i * 0.0001);
-                const angleOffset = (i * Math.PI) / 4;
+        // Create orbiting circles with different properties
+        for (let i = 0; i < 8; i++) {
+            const circle = document.createElement('div');
+            circle.className = 'orbiting-circle';
 
-                circle.style.width = `${size}px`;
-                circle.style.height = `${size}px`;
-                circle.style.borderWidth = `${1 + (i * 0.3)}px`;
+            // Different sizes and speeds
+            const size = 20 + (i * 10);
+            const radius = 100 + (i * 50);
+            const speed = 0.5 + (i * 0.1);
+            const angleOffset = (i * Math.PI) / 4;
 
-                // Animation loop
-                let angle = 0;
-                function animate() {
-                    angle += speed;
-                    const x = centerX + Math.cos(angle + angleOffset) * radius;
-                    const y = centerY + Math.sin(angle + angleOffset) * radius;
-                    circle.style.left = `${x - size/2}px`;
-                    circle.style.top = `${y - size/2}px`;
-                    requestAnimationFrame(animate);
-                }
+            circle.style.width = `${size}px`;
+            circle.style.height = `${size}px`;
+            circle.style.borderWidth = `${1 + (i * 0.3)}px`;
 
-                container.appendChild(circle);
-                animate();
+            let angle = angleOffset;
+            function updatePosition() {
+                angle += speed * 0.01;
+                const x = centerX + Math.cos(angle) * radius;
+                const y = centerY + Math.sin(angle) * radius;
+                circle.style.left = `${x - size/2}px`;
+                circle.style.top = `${y - size/2}px`;
+                requestAnimationFrame(updatePosition);
             }
 
-            // Disable scrolling
-            document.body.style.overflow = 'hidden';
-            window.addEventListener('scroll', () => window.scrollTo(0, 0));
-        });
+            container.appendChild(circle);
+            updatePosition();
+        }
+
+        // Disable scrolling
+        document.body.style.overflow = 'hidden';
+        window.addEventListener('scroll', () => window.scrollTo(0, 0));
+    })();
     </script>
     """)
 
     # Page structure
     st.markdown("""
     <div class="center-container">
-        <div class="orbit-container"></div>
         <div class="main-text">Lley</div>
     </div>
     """, unsafe_allow_html=True)
