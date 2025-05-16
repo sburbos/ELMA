@@ -812,22 +812,27 @@ def pdf2quiz():
 
     # File uploader for both PDF and PPTX
     uploaded_file = st.file_uploader("Upload File", type=["pdf", "pptx"])
-    toggle_swap = st.toggle("Custom or Additional Prompt")
 
+    # Toggle for custom prompt
+    toggle_swap = st.toggle("Add Custom Prompt")
+    extra_prompt = ""
 
-    if uploaded_file or toggle_swap:
-        # Display file info
-        extra_prompt = st.text_area("Task/s", "", height=150)
-        if uploaded_file:
-            file_name = uploaded_file.name
-            file_type = file_name.split(".")[-1]
-            file_content = uploaded_file.getvalue()
+    if toggle_swap:
+        extra_prompt = st.text_area("Additional Instructions", "", height=150,
+                                    help="Add any specific instructions for quiz generation")
+
+    if uploaded_file:
         file_type = "PDF" if uploaded_file.name.endswith('.pdf') else "PPTX"
         st.write(f"Uploaded {file_type} file: {uploaded_file.name} ({uploaded_file.size / 1024:.2f} KB)")
 
         # Number of questions input
         number_quiz = st.number_input(
-            "Number of questions to generate", min_value=1, max_value=100,value=5,help="Select how many quiz questions you want to generate from the file")
+            "Number of questions to generate",
+            min_value=1,
+            max_value=100,
+            value=5,
+            help="Select how many quiz questions you want to generate from the file"
+        )
 
         if st.button("Generate Quiz"):
             with st.spinner(f"Generating quiz from {file_type}..."):
@@ -847,7 +852,8 @@ def pdf2quiz():
                     full_prompt = f"""Create a multiple choice quiz based on the following text. 
                     Generate {number_quiz} good quality questions that test understanding of key concepts.
                     For each question, provide 4 plausible options (a-d) and indicate the correct answer.
-                    Return ONLY the Python dictionary in the specified format. Extra information: {extra_prompt}
+                    Return ONLY the Python dictionary in the specified format. 
+                    {extra_prompt if toggle_swap else ''}
 
                     Text content:
                     {extracted_text[:10000]}"""  # Limit to first 10k chars
