@@ -625,63 +625,63 @@ def page_4():
 
     uploaded_file = st.file_uploader("Upload PDF", type="pdf")
         
-        if uploaded_file:
-            with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
-                tmp_file.write(uploaded_file.getvalue())
-                tmp_path = tmp_file.name
-            
-            if st.button("Generate Quiz"):
-                with st.spinner("Creating quiz..."):
-                    try:
-                        pdf_text = pdf_file_extractor(tmp_path)
-                        prompt = """Create a quiz with 5 multiple choice questions based on this text. 
-                        Return ONLY a Python dictionary with this exact structure:
-                        {
-                            "1": {
-                                "question": "...",
-                                "options": ["A", "B", "C", "D"],
-                                "answers": ["Option A text", "Option B text", ...],
-                                "correct": "A"
-                            },
-                            ...
-                        }
-                        Text: """ + "\n".join(pdf_text)
-                        
-                        quiz_str = ai_assistant(prompt)
-                        
-                        if quiz_str:
-                            try:
-                                quiz = ast.literal_eval(quiz_str)
-                                st.session_state.quiz = quiz
-                            except Exception as e:
-                                st.error(f"Failed to parse quiz: {str(e)}")
-                                st.code(quiz_str)
+    if uploaded_file:
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+            tmp_file.write(uploaded_file.getvalue())
+            tmp_path = tmp_file.name
+        
+        if st.button("Generate Quiz"):
+            with st.spinner("Creating quiz..."):
+                try:
+                    pdf_text = pdf_file_extractor(tmp_path)
+                    prompt = """Create a quiz with 5 multiple choice questions based on this text. 
+                    Return ONLY a Python dictionary with this exact structure:
+                    {
+                        "1": {
+                            "question": "...",
+                            "options": ["A", "B", "C", "D"],
+                            "answers": ["Option A text", "Option B text", ...],
+                            "correct": "A"
+                        },
+                        ...
+                    }
+                    Text: """ + "\n".join(pdf_text)
                     
-                    except Exception as e:
-                        st.error(f"Error: {str(e)}")
+                    quiz_str = ai_assistant(prompt)
+                    
+                    if quiz_str:
+                        try:
+                            quiz = ast.literal_eval(quiz_str)
+                            st.session_state.quiz = quiz
+                        except Exception as e:
+                            st.error(f"Failed to parse quiz: {str(e)}")
+                            st.code(quiz_str)
+                
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
 
-            if 'quiz' in st.session_state:
-                for q_num, question in st.session_state.quiz.items():
-                    st.subheader(f"Question {q_num}")
-                    st.write(question["question"])
-                    
-                    # Display options
-                    user_answer = st.radio(
-                        "Select answer:",
-                        options=question["options"],
-                        key=f"q{q_num}"
-                    )
-                    
-                    # Check answer only after submission
-                    if st.button(f"Check Answer {q_num}"):
-                        if user_answer == question["correct"]:
-                            st.success("Correct!")
-                        else:
-                            st.error(f"Wrong! Correct answer is: {question['correct']}")
-                            st.write(f"Explanation: {question.get('explanation', 'No explanation provided')}")
+        if 'quiz' in st.session_state:
+            for q_num, question in st.session_state.quiz.items():
+                st.subheader(f"Question {q_num}")
+                st.write(question["question"])
+                
+                # Display options
+                user_answer = st.radio(
+                    "Select answer:",
+                    options=question["options"],
+                    key=f"q{q_num}"
+                )
+                
+                # Check answer only after submission
+                if st.button(f"Check Answer {q_num}"):
+                    if user_answer == question["correct"]:
+                        st.success("Correct!")
+                    else:
+                        st.error(f"Wrong! Correct answer is: {question['correct']}")
+                        st.write(f"Explanation: {question.get('explanation', 'No explanation provided')}")
 
-    except Exception as e:
-        st.error(f"Application error: {str(e)}")
+except Exception as e:
+    st.error(f"Application error: {str(e)}")
 
 
 
