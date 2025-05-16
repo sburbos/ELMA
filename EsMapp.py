@@ -593,7 +593,7 @@ def page_4():
 
     def pdf_file_extractor(pdf_file: str) -> [str]:
         with open(pdf_file, "rb") as pdf:
-            reader = PyPDF2.PdfFileReader(pdf, strict=False)
+            reader = PyPDF2.PdfReader(pdf)  # Updated to PdfReader
             pdf_text = []
 
             for page in reader.pages:
