@@ -811,8 +811,17 @@ def pdf2quiz():
             )
             st.success(f"Your score: {score}/{len(st.session_state.quiz['data'])}")
 
-pg = st.navigation(
-    [st.Page(main_page, title="Essay Maker"), st.Page(esma, title="Essay Maker"), st.Page(tetos, title="Text To Speech"), st.Page(aito, title="AITO"),st.Page(pdf2quiz, title="Pdf to Quiz") ])
+def about():
+    st.title("About")
+
+pages={ "Tools": [st.Page(main_page, title="Home"), st.Page(esma, title="Essay Maker"),
+              st.Page(tetos, title="Text To Speech"),
+              st.Page(aito, title="AITO"),
+              st.Page(pdf2quiz, title="Pdf to Quiz")],
+        "About": [st.Page(about, title="About")],
+
+        }
+pg = st.navigation(pages)
 pg.run()
 
 
