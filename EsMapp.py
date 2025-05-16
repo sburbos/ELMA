@@ -600,7 +600,27 @@ def page_4():
                 content = page.extract_text()
                 pdf_text.append(content)
         return pdf_text
+    def ai_assistant(prompt):
+        try:
+            response = client.chat.completions.create(
+                model="nousresearch/deephermes-3-mistral-24b-preview:free",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """You are a system only for creating a quiz python dictionary"""},
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_tokens=20000  # Added to prevent timeouts
+            )
+            return response.choices[0].message.content
 
+        except Exception as det:
+            st.error(f"Failed to generate essay: {str(det)}")
+            return None
+        
     st.title("PDF to Quiz")
 
     with st.container():
