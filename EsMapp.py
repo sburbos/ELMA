@@ -61,7 +61,7 @@ def main_page():
         /* Name styling */
         .name {
             font-family: 'Arial', sans-serif;
-            font-size: 8rem;
+            font-size: 20rem;
             font-weight: 700;
             animation: glow 3s ease-in-out infinite;
             margin: 0;
