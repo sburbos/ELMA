@@ -684,7 +684,7 @@ def pdf2quiz():
 
         # Number of questions input
         number_quiz = st.number_input(
-            "Number of questions to generate", min_value=1, max_value=20,value=5,help="Select how many quiz questions you want to generate from the file")
+            "Number of questions to generate", min_value=1, max_value=100,value=5,help="Select how many quiz questions you want to generate from the file")
 
         if st.button("Generate Quiz"):
             with st.spinner(f"Generating quiz from {file_type}..."):
