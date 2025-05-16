@@ -13,7 +13,7 @@ import ast
 st.set_page_config(
     page_title="Lley",
     page_icon=":writing_hand:",
-    layout="wide"
+    layout="centered"
 )
 st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 def main_page():
