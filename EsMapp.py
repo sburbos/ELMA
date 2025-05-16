@@ -13,7 +13,7 @@ import math
 # Initialize the OpenAI client with proper configuration
 
 st.set_page_config(
-    page_title="Lley",
+    page_title="LleY",
     page_icon=":writing_hand:",
     layout="centered"
 )
@@ -50,12 +50,12 @@ def main_page():
             font-family: 'Chakra Petch', sans-serif;
             font-size: clamp(3rem, 10vw, 8rem);
             font-weight: 700;
-            color: #ff6a6a; /* Reddish pink */
+            color: #ff6a6a;
             text-transform: uppercase;
             letter-spacing: 0.5rem;
             text-align: center;
             position: relative;
-            z-index: 2;
+            z-index: 10;
         }
 
         /* Orbiting circles container */
@@ -66,7 +66,7 @@ def main_page():
             width: 100%;
             height: 100%;
             pointer-events: none;
-            overflow: hidden;
+            z-index: 1;
         }
 
         /* Circle styling */
@@ -84,54 +84,76 @@ def main_page():
     # JavaScript for orbiting circles animation
     html("""
     <script>
-    (function() {
-        const container = document.createElement('div');
-        container.className = 'orbit-container';
-        document.querySelector('.center-container').prepend(container);
+    // Wait for Streamlit to fully load
+    function waitForElm(selector) {
+        return new Promise(resolve => {
+            if (document.querySelector(selector)) {
+                return resolve(document.querySelector(selector));
+            }
+
+            const observer = new MutationObserver(mutations => {
+                if (document.querySelector(selector)) {
+                    observer.disconnect();
+                    resolve(document.querySelector(selector));
+                }
+            });
+
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        });
+    }
+
+    waitForElm('.center-container').then((container) => {
+        // Create orbit container
+        const orbitContainer = document.createElement('div');
+        orbitContainer.className = 'orbit-container';
+        container.prepend(orbitContainer);
 
         const centerX = window.innerWidth / 2;
         const centerY = window.innerHeight / 2;
 
-        // Create orbiting circles with different properties
+        // Create 8 orbiting circles
         for (let i = 0; i < 8; i++) {
             const circle = document.createElement('div');
             circle.className = 'orbiting-circle';
 
-            // Different sizes and speeds
-            const size = 20 + (i * 10);
-            const radius = 100 + (i * 50);
-            const speed = 0.5 + (i * 0.1);
-            const angleOffset = (i * Math.PI) / 4;
+            // Different properties for each circle
+            const size = 20 + (i * 15);
+            const radius = 80 + (i * 60);
+            const speed = 0.2 + (i * 0.05);
+            const startAngle = (i * Math.PI * 2) / 8;
 
             circle.style.width = `${size}px`;
             circle.style.height = `${size}px`;
             circle.style.borderWidth = `${1 + (i * 0.3)}px`;
 
-            let angle = angleOffset;
-            function updatePosition() {
+            let angle = startAngle;
+            function animate() {
                 angle += speed * 0.01;
                 const x = centerX + Math.cos(angle) * radius;
                 const y = centerY + Math.sin(angle) * radius;
                 circle.style.left = `${x - size/2}px`;
                 circle.style.top = `${y - size/2}px`;
-                requestAnimationFrame(updatePosition);
+                requestAnimationFrame(animate);
             }
 
-            container.appendChild(circle);
-            updatePosition();
+            orbitContainer.appendChild(circle);
+            animate();
         }
 
         // Disable scrolling
         document.body.style.overflow = 'hidden';
         window.addEventListener('scroll', () => window.scrollTo(0, 0));
-    })();
+    });
     </script>
     """)
 
-    # Page structure
+    # Page structure - just the text container
     st.markdown("""
     <div class="center-container">
-        <div class="main-text">Lley</div>
+        <div class="main-text">LleY</div>
     </div>
     """, unsafe_allow_html=True)
 # Debug: Show loaded secrets (remove after testing)
