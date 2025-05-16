@@ -17,7 +17,7 @@ st.set_page_config(
 
 # Debug: Show loaded secrets (remove after testing)
 
-def page_1():
+def esma():
     try:
         # Access nested secrets
         api_key = st.secrets.openrouter.OPENAI_API_KEY
@@ -465,7 +465,7 @@ async def text_to_speech(text, filename, character):
     return filename  # Return filename after saving
 
 
-def page_2():
+def tetos():
     st.subheader("TeTos by Elley")
     st.title("Free Online Text-To-Speech Tool ")
     content_prompt = st.text_area("Prompt", "", height=150)
@@ -490,7 +490,7 @@ def page_2():
                 st.audio(audio_bytes, format="audio/mpeg", loop=True)
 
 
-def page_3():
+def aito():
     try:
         # Access nested secrets
         api_key = st.secrets.openrouter.OPENAI_API_KEY
@@ -561,7 +561,7 @@ def page_3():
             st.chat_message("assistant").write(response)
 
 
-def page_4():
+def pdf2quiz():
     try:
         # Access nested secrets
         api_key = st.secrets.openrouter.OPENAI_API_KEY
@@ -766,10 +766,8 @@ def page_4():
             st.success(f"Your score: {score}/{len(st.session_state.quiz['data'])}")
 
 
-
-
 pg = st.navigation(
-    [st.Page(page_1, title="Essay Maker"), st.Page(page_2, title="Text To Speech"), st.Page(page_3, title="AITO"),st.Page(page_4, title="pdf to quiz") ])
+    [st.Page(esma, title="Essay Maker"), st.Page(tetos, title="Text To Speech"), st.Page(aito, title="AITO"),st.Page(pdf2quiz, title="pdf to quiz") ])
 pg.run()
 
 
