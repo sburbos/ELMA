@@ -15,6 +15,7 @@ st.set_page_config(
     page_icon=":writing_hand:",
     layout="wide"
 )
+st.logo("logo 1.png", icon_image="logo 3.png")
 def main_page():
     st.markdown("""
     <style>
@@ -114,7 +115,7 @@ def main_page():
     <div class="static-container">
         <h1 class="name">Lley</h1>
         <div class="underline"></div>
-        <div class="footer">EST. 2023</div>
+        <div class="footer">EST. 2025</div>
     </div>
     """, unsafe_allow_html=True)
 
