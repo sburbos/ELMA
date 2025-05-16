@@ -22,29 +22,32 @@ def main_page():
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@700&display=swap');
 
+        /* Reset all margins and padding */
         html, body, .stApp {
-            overflow: hidden;
-            height: 100vh;
-            width: 100vw;
-            margin: 0;
-            padding: 0;
-            background: #000;
-            display: flex !important;
-            justify-content: center !important;
-            align-items: center !important;
+            overflow: hidden !important;
+            height: 100vh !important;
+            width: 100vw !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #000 !important;
         }
 
-        .main-container {
+        /* Create a centered container */
+        .centered-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            width: 100vw;
         }
 
+        /* Futuristic text styling */
         .futur-text {
             font-family: 'Chakra Petch', sans-serif;
-            font-size: 8rem;
+            font-size: clamp(3rem, 10vw, 8rem); /* Responsive font size */
             font-weight: 700;
             color: #00d2ff;
             text-transform: uppercase;
@@ -52,68 +55,54 @@ def main_page():
             text-shadow: 0 0 10px rgba(0, 210, 255, 0.7);
             animation: pulse 3s ease-in-out infinite;
             text-align: center;
-            margin: 0 auto;
+            margin: 0;
+            padding: 0;
         }
 
+        /* Simple pulse animation */
         @keyframes pulse {
-            0%, 100% { opacity: 0.9; text-shadow: 0 0 10px rgba(0, 210, 255, 0.7); }
-            50% { opacity: 1; text-shadow: 0 0 20px rgba(0, 210, 255, 0.9); }
+            0%, 100% { 
+                opacity: 0.9; 
+                text-shadow: 0 0 10px rgba(0, 210, 255, 0.7); 
+            }
+            50% { 
+                opacity: 1; 
+                text-shadow: 0 0 20px rgba(0, 210, 255, 0.9), 
+                             0 0 30px rgba(0, 210, 255, 0.5); 
+            }
         }
 
-        @media (max-width: 768px) {
-            .futur-text {
-                font-size: 4rem;
-            }
+        /* Grid background effect */
+        .grid-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 210, 255, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 210, 255, 0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: -1;
+            animation: grid-move 100s linear infinite;
+        }
+
+        @keyframes grid-move {
+            from { background-position: 0 0; }
+            to { background-position: 1000px 1000px; }
         }
     </style>
     """, unsafe_allow_html=True)
 
-    # Display centered content
+    # Background grid
+    st.markdown('<div class="grid-bg"></div>', unsafe_allow_html=True)
+
+    # Centered content
     st.markdown("""
-    <div class="main-container">
+    <div class="centered-container">
         <div class="futur-text">Lley</div>
     </div>
     """, unsafe_allow_html=True)
-
-    # JavaScript with error handling
-    try:
-        html("""
-        <script>
-            try {
-                // Disable scrolling
-                document.body.style.overflow = 'hidden';
-                window.addEventListener('scroll', function() {
-                    window.scrollTo(0, 0);
-                });
-
-                // Simple cursor effect
-                document.addEventListener('mousemove', function(e) {
-                    const cursor = document.getElementById('custom-cursor') || document.createElement('div');
-                    cursor.id = 'custom-cursor';
-                    cursor.style.position = 'fixed';
-                    cursor.style.width = '20px';
-                    cursor.style.height = '20px';
-                    cursor.style.border = '2px solid rgba(0, 210, 255, 0.7)';
-                    cursor.style.borderRadius = '50%';
-                    cursor.style.left = (e.clientX - 10) + 'px';
-                    cursor.style.top = (e.clientY - 10) + 'px';
-                    cursor.style.pointerEvents = 'none';
-                    cursor.style.zIndex = '9999';
-                    cursor.style.transition = 'transform 0.1s ease';
-                    cursor.style.transform = 'scale(' + (1 + Math.random() * 0.3) + ')';
-
-                    if (!document.getElementById('custom-cursor')) {
-                        document.body.appendChild(cursor);
-                    }
-                });
-            } catch(e) {
-                console.log('JavaScript error:', e);
-            }
-        </script>
-        """)
-    except Exception as e:
-        st.error("Interactive elements could not load")
-        print(f"JavaScript execution error: {e}")
 # Debug: Show loaded secrets (remove after testing)
 
 def esma():
