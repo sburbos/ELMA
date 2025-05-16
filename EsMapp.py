@@ -592,14 +592,18 @@ def page_4():
         st.stop()
 
     def pdf_file_extractor(pdf_file: str) -> [str]:
-        with open(pdf_file, "rb") as pdf:
-            reader = PyPDF2.PdfReader(pdf)  # Updated to PdfReader
+        try:
+            reader = PyPDF2.PdfReader(pdf_file)
             pdf_text = []
-
             for page in reader.pages:
                 content = page.extract_text()
-                pdf_text.append(content)
-        return pdf_text
+                if content:  # Only add if text was extracted
+                    pdf_text.append(content)
+            return "\n".join(pdf_text) if pdf_text else "No text could be extracted from the PDF."
+        except Exception as e:
+            st.error(f"Error reading PDF: {str(e)}")
+            return None
+
     def ai_assistant(prompt):
         try:
             response = client.chat.completions.create(
@@ -607,91 +611,133 @@ def page_4():
                 messages=[
                     {
                         "role": "system",
-                        "content": """You are a system only for creating a quiz python dictionary"""},
+                        "content": """You are a system only for creating a quiz python dictionary. 
+                        Return ONLY a properly formatted Python dictionary with no additional text or explanation.
+                        Format:
+                        {
+                            "1": {
+                                "question": "Question text",
+                                "a": "Option A",
+                                "b": "Option B",
+                                "c": "Option C",
+                                "d": "Option D",
+                                "answer_key": "correct_letter"
+                            },
+                            ...
+                        }"""
+                    },
                     {
                         "role": "user",
                         "content": prompt
                     }
                 ],
-                max_tokens=20000  # Added to prevent timeouts
+                max_tokens=20000,
+                temperature=0.3  # Lower temperature for more deterministic output
             )
             return response.choices[0].message.content
-
         except Exception as det:
-            st.error(f"Failed to generate essay: {str(det)}")
+            st.error(f"Failed to generate quiz: {str(det)}")
             return None
-        
+
     st.title("PDF to Quiz")
 
     with st.container():
-        file = st.file_uploader("Select a File", accept_multiple_files=False)
+        file = st.file_uploader("Select a PDF File", type=["pdf"], accept_multiple_files=False)
+
         if file is not None:
-            # Save uploaded file to temp file
-            with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
-                tmp_file.write(file.getvalue())
-                tmp_file_path = tmp_file.name
+            # Display PDF info
+            st.write(f"File uploaded: {file.name} ({file.size / 1024 / 1024:.2f} MB)")
 
             if st.button("Generate Quiz"):
-                with st.spinner("Generating your quiz..."):
-                    pdf_text_out = pdf_file_extractor(tmp_file_path)
-                    full_prompt = """Use the following text to create a quiz. Return only a Python dictionary in this exact format:
-                    {
-                        "1": {
-                            "question": "Your generated question",
-                            "a": "Choice A",
-                            "b": "Choice B",
-                            "c": "Choice C",
-                            "d": "Choice D",
-                            "answer_key": "correct_letter"
-                        },
-                        "2": {
-                            ...
-                        }
-                    }
-                    Text: """ + "\n".join(pdf_text_out)
+                with st.spinner("Processing PDF and generating quiz..."):
+                    # Save uploaded file to temp file
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                        tmp_file.write(file.getvalue())
+                        tmp_file_path = tmp_file.name
 
-                    content_out = ai_assistant(full_prompt)
+                    # Extract text from PDF
+                    pdf_text = pdf_file_extractor(tmp_file_path)
 
-                    if content_out:
-                        try:
-                            # Clean the output and convert to dictionary
-                            dictionary_out = ast.literal_eval(content_out)
+                    if pdf_text and pdf_text != "No text could be extracted from the PDF.":
+                        full_prompt = f"""Create a multiple choice quiz based on the following text. 
+                        Generate 5-10 good quality questions that test understanding of key concepts.
+                        For each question, provide 4 plausible options (a-d) and indicate the correct answer.
+                        Return ONLY the Python dictionary in the specified format.
 
-                            # Display each question
-                            for q_num, question_data in dictionary_out.items():
-                                st.subheader(f"Question {q_num}")
-                                st.write(question_data["question"])
+                        Text content:
+                        {pdf_text[:10000]}"""  # Limit to first 10k chars to avoid token limits
 
-                                # Create options list in correct order
-                                options = [
-                                    question_data["a"],
-                                    question_data["b"],
-                                    question_data["c"],
-                                    question_data["d"]
-                                ]
+                        content_out = ai_assistant(full_prompt)
 
-                                # Display radio button
-                                user_answer = st.radio(
-                                    label="Select your answer:",
-                                    options=options,
-                                    key=f"question_{q_num}"
-                                )
+                        if content_out:
+                            try:
+                                # Clean the output by removing markdown code blocks if present
+                                clean_output = content_out.strip()
+                                if clean_output.startswith("```python"):
+                                    clean_output = clean_output[9:]
+                                if clean_output.startswith("```"):
+                                    clean_output = clean_output[3:]
+                                if clean_output.endswith("```"):
+                                    clean_output = clean_output[:-3]
 
-                                # Check answer
-                                if user_answer:
-                                    correct_answer = question_data[question_data["answer_key"]]
-                                    if user_answer == correct_answer:
-                                        st.success("Correct!")
-                                    else:
-                                        st.error(f"Wrong! The correct answer is: {correct_answer}")
+                                # Convert to dictionary
+                                dictionary_out = ast.literal_eval(clean_output)
 
-                        except Exception as e:
-                            st.error(f"Error processing quiz: {str(e)}")
-                            st.text("Raw AI output:")
-                            st.code(content_out)
+                                # Display quiz title
+                                st.subheader("Generated Quiz")
+                                st.write(f"Based on: {file.name}")
 
+                                # Initialize score tracking
+                                if 'score' not in st.session_state:
+                                    st.session_state.score = 0
+                                    st.session_state.answers = {}
 
+                                # Display each question
+                                for q_num, question_data in dictionary_out.items():
+                                    st.markdown(f"**Question {q_num}**")
+                                    st.write(question_data["question"])
 
+                                    # Create options list in correct order
+                                    options = [
+                                        question_data["a"],
+                                        question_data["b"],
+                                        question_data["c"],
+                                        question_data["d"]
+                                    ]
+
+                                    # Display radio button
+                                    user_answer = st.radio(
+                                        label="Select your answer:",
+                                        options=options,
+                                        key=f"question_{q_num}",
+                                        index=None  # Start with no selection
+                                    )
+
+                                    # Check answer when user selects one
+                                    if user_answer:
+                                        correct_answer = question_data[question_data["answer_key"]]
+                                        if user_answer == correct_answer:
+                                            st.session_state.score += 1
+                                            st.success("✓ Correct!")
+                                        else:
+                                            st.error(f"✗ Incorrect. The correct answer is: {correct_answer}")
+                                        st.session_state.answers[q_num] = (user_answer == correct_answer)
+
+                                # Display total score
+                                total_questions = len(dictionary_out)
+                                if st.session_state.answers and len(st.session_state.answers) == total_questions:
+                                    st.markdown(f"### Your score: {st.session_state.score}/{total_questions}")
+
+                                # Show raw dictionary for debugging
+                                with st.expander("View raw quiz data"):
+                                    st.code(clean_output)
+
+                            except Exception as e:
+                                st.error(f"Error processing quiz: {str(e)}")
+                                st.text("Raw AI output:")
+                                st.code(content_out)
+                    else:
+                        st.warning("Could not extract text from the PDF or PDF was empty.")
 
 
 
