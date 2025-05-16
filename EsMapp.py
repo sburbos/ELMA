@@ -7,7 +7,7 @@ import asyncio
 import PyPDF2
 from io import StringIO
 import ast
-from streamlit.components.v1 import html
+
 # Initialize the OpenAI client with proper configuration
 
 st.set_page_config(
@@ -18,7 +18,7 @@ st.set_page_config(
 st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 def main_page():
     st.image(
-        "logo",
+        "logo.gif",
         caption="AI-Powered Tools",
         use_column_width=True,  # True to fit column width
         output_format="auto"  # Or "GIF", "PNG", "JPEG"
