@@ -20,7 +20,7 @@ def main_page():
     st.image(
         "logo.gif",
         caption="AI-Powered Tools",
-        use_column_width=True,  # True to fit column width
+        use_container_width=True,  # True to fit column width
         output_format="auto"  # Or "GIF", "PNG", "JPEG"
     )
 
