@@ -668,7 +668,7 @@ def page_4():
                 if pdf_text and pdf_text != "No text could be extracted from the PDF.":
                     # Generate quiz from text
                     full_prompt = f"""Create a multiple choice quiz based on the following text. 
-                    Generate 5-10 good quality questions that test understanding of key concepts.
+                    Generate minimum of 5 and maximum of 100 good quality questions that test understanding of key concepts.
                     For each question, provide 4 plausible options (a-d) and indicate the correct answer.
                     Return ONLY the Python dictionary in the specified format.
 
