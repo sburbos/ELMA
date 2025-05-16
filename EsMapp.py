@@ -17,12 +17,9 @@ st.set_page_config(
 )
 st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 def main_page():
-    st.image(
-        "logo.gif",
-        caption="AI-Powered Tools",
-        width=300,  # True to fit column width
-        output_format="auto"  # Or "GIF", "PNG", "JPEG"
-    )
+    video_file = open("final.mp4", "rb")
+    video_bytes = video_file.read()
+    st.video(video_bytes, loop = True, autoplay = True)
 
 
 
