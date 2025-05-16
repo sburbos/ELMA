@@ -623,65 +623,73 @@ def page_4():
         
     st.title("PDF to Quiz")
 
-    uploaded_file = st.file_uploader("Upload PDF", type="pdf")
-        
-    if uploaded_file:
-        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
-            tmp_file.write(uploaded_file.getvalue())
-            tmp_path = tmp_file.name
-        
-        if st.button("Generate Quiz"):
-            with st.spinner("Creating quiz..."):
-                try:
-                    pdf_text = pdf_file_extractor(tmp_path)
-                    prompt = """Create a quiz with 5 multiple choice questions based on this text. 
-                    Return ONLY a Python dictionary with this exact structure:
+    with st.container():
+        file = st.file_uploader("Select a File", accept_multiple_files=False)
+        if file is not None:
+            # Save uploaded file to temp file
+            with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+                tmp_file.write(file.getvalue())
+                tmp_file_path = tmp_file.name
+
+            if st.button("Generate Quiz"):
+                with st.spinner("Generating your quiz..."):
+                    pdf_text_out = pdf_file_extractor(tmp_file_path)
+                    full_prompt = """Use the following text to create a quiz. Return only a Python dictionary in this exact format:
                     {
                         "1": {
-                            "question": "...",
-                            "options": ["A", "B", "C", "D"],
-                            "answers": ["Option A text", "Option B text", ...],
-                            "correct": "A"
+                            "question": "Your generated question",
+                            "a": "Choice A",
+                            "b": "Choice B",
+                            "c": "Choice C",
+                            "d": "Choice D",
+                            "answer_key": "correct_letter"
                         },
-                        ...
+                        "2": {
+                            ...
+                        }
                     }
-                    Text: """ + "\n".join(pdf_text)
-                    
-                    quiz_str = ai_assistant(prompt)
-                    
-                    if quiz_str:
+                    Text: """ + "\n".join(pdf_text_out)
+
+                    content_out = ai_assistant(full_prompt)
+
+                    if content_out:
                         try:
-                            quiz = ast.literal_eval(quiz_str)
-                            st.session_state.quiz = quiz
+                            # Clean the output and convert to dictionary
+                            dictionary_out = ast.literal_eval(content_out)
+
+                            # Display each question
+                            for q_num, question_data in dictionary_out.items():
+                                st.subheader(f"Question {q_num}")
+                                st.write(question_data["question"])
+
+                                # Create options list in correct order
+                                options = [
+                                    question_data["a"],
+                                    question_data["b"],
+                                    question_data["c"],
+                                    question_data["d"]
+                                ]
+
+                                # Display radio button
+                                user_answer = st.radio(
+                                    label="Select your answer:",
+                                    options=options,
+                                    key=f"question_{q_num}"
+                                )
+
+                                # Check answer
+                                if user_answer:
+                                    correct_answer = question_data[question_data["answer_key"]]
+                                    if user_answer == correct_answer:
+                                        st.success("Correct!")
+                                    else:
+                                        st.error(f"Wrong! The correct answer is: {correct_answer}")
+
                         except Exception as e:
-                            st.error(f"Failed to parse quiz: {str(e)}")
-                            st.code(quiz_str)
-                
-                except Exception as e:
-                    st.error(f"Error: {str(e)}")
+                            st.error(f"Error processing quiz: {str(e)}")
+                            st.text("Raw AI output:")
+                            st.code(content_out)
 
-        if 'quiz' in st.session_state:
-            for q_num, question in st.session_state.quiz.items():
-                st.subheader(f"Question {q_num}")
-                st.write(question["question"])
-                
-                # Display options
-                user_answer = st.radio(
-                    "Select answer:",
-                    options=question["options"],
-                    key=f"q{q_num}"
-                )
-                
-                # Check answer only after submission
-                if st.button(f"Check Answer {q_num}"):
-                    if user_answer == question["correct"]:
-                        st.success("Correct!")
-                    else:
-                        st.error(f"Wrong! Correct answer is: {question['correct']}")
-                        st.write(f"Explanation: {question.get('explanation', 'No explanation provided')}")
-
-except Exception as e:
-    st.error(f"Application error: {str(e)}")
 
 
 
