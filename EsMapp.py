@@ -594,7 +594,7 @@ def pdf2quiz():
         st.error(f"API connection failed: {str(d)}")
         st.stop()
 
-    def pdf_file_extractor(pdf_file: str) -> [str]:
+    def extract_pdf_text(pdf_file: str) -> str:
         try:
             reader = PyPDF2.PdfReader(pdf_file)
             pdf_text = []
@@ -603,8 +603,25 @@ def pdf2quiz():
                 if content:  # Only add if text was extracted
                     pdf_text.append(content)
             return "\n".join(pdf_text) if pdf_text else "No text could be extracted from the PDF."
-        except Exception as e:
-            st.error(f"Error reading PDF: {str(e)}")
+        except Exception as f:
+            st.error(f"Error reading PDF: {str(f)}")
+            return None
+
+    def extract_pptx_text(pptx_file):
+        try:
+            from pptx import Presentation
+            prs = Presentation(pptx_file)
+            text = []
+            for slide in prs.slides:
+                for shape in slide.shapes:
+                    if hasattr(shape, "text"):
+                        text.append(shape.text)
+            return "\n".join(text) if text else "No text could be extracted from the PPTX."
+        except ImportError:
+            st.error("Please install python-pptx package: pip install python-pptx")
+            return None
+        except Exception as d:
+            st.error(f"Error reading PPTX: {str(d)}")
             return None
 
     def ai_assistant(prompt):
@@ -648,28 +665,39 @@ def pdf2quiz():
             'data': None,
             'answers': {},
             'submitted': False,
-            'file_processed': None
+            'file_processed': None,
+            'file_type': None
         }
 
-    st.title("PDF to Quiz")
+    st.title("File to Quiz Generator")
+    st.subheader("Upload PDF or PPTX to generate a quiz")
 
-    # File uploader
-    pdf_file = st.file_uploader("Upload PDF", type="pdf" and "pptx")
+    # File uploader for both PDF and PPTX
+    uploaded_file = st.file_uploader("Upload File", type=["pdf", "pptx"])
 
-    # Generate quiz button
-    if pdf_file and (pdf_file != st.session_state.quiz['file_processed'] or st.session_state.quiz['data'] is None):
-        number_quiz = st.number_input("Insert a number", min_value = 1, max_value = 100, value=5, placeholder="Type a number...")
+    if uploaded_file:
+        # Display file info
+        file_type = "PDF" if uploaded_file.name.endswith('.pdf') else "PPTX"
+        st.write(f"Uploaded {file_type} file: {uploaded_file.name} ({uploaded_file.size / 1024:.2f} KB)")
+
+        # Number of questions input
+        number_quiz = st.number_input(
+            "Number of questions to generate", min_value=1, max_value=20,value=5,help="Select how many quiz questions you want to generate from the file")
+
         if st.button("Generate Quiz"):
-            with st.spinner("Generating quiz from PDF..."):
+            with st.spinner(f"Generating quiz from {file_type}..."):
                 # Save uploaded file to temp file
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-                    tmp_file.write(pdf_file.getvalue())
+                with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+                    tmp_file.write(uploaded_file.getvalue())
                     tmp_file_path = tmp_file.name
 
-                # Extract text from PDF
-                pdf_text = pdf_file_extractor(tmp_file_path)
+                # Extract text based on file type
+                if uploaded_file.name.endswith('.pdf'):
+                    extracted_text = extract_pdf_text(tmp_file_path)
+                else:
+                    extracted_text = extract_pptx_text(tmp_file_path)
 
-                if pdf_text and pdf_text != "No text could be extracted from the PDF.":
+                if extracted_text and not extracted_text.startswith("No text"):
                     # Generate quiz from text
                     full_prompt = f"""Create a multiple choice quiz based on the following text. 
                     Generate {number_quiz} good quality questions that test understanding of key concepts.
@@ -677,7 +705,7 @@ def pdf2quiz():
                     Return ONLY the Python dictionary in the specified format.
 
                     Text content:
-                    {pdf_text[:10000]}"""
+                    {extracted_text[:10000]}"""  # Limit to first 10k chars
 
                     content_out = ai_assistant(full_prompt)
 
@@ -700,7 +728,8 @@ def pdf2quiz():
                                 'data': quiz_data,
                                 'answers': {q_num: None for q_num in quiz_data},
                                 'submitted': False,
-                                'file_processed': pdf_file
+                                'file_processed': uploaded_file,
+                                'file_type': file_type
                             }
                             st.rerun()
 
@@ -708,46 +737,56 @@ def pdf2quiz():
                             st.error(f"Error processing quiz: {str(e)}")
                             st.text("Raw AI output:")
                             st.code(content_out)
+                else:
+                    st.warning(extracted_text or "Could not extract text from the file")
 
     # Display the quiz if generated
     if st.session_state.quiz['data']:
-        st.subheader("Test Your Knowledge")
+        st.subheader(f"Quiz Generated from {st.session_state.quiz['file_type']}")
+        st.write(f"File: {st.session_state.quiz['file_processed'].name}")
 
-        # Display each question
+        # Track if all questions have been answered
+        all_answered = True
+
         for q_num, question in st.session_state.quiz['data'].items():
-            st.write(f"**{q_num}. {question['question']}**")
+            st.markdown(f"**Question {q_num}**")
+            st.write(question['question'])
 
-            # Get current answer or None if not answered
+            options = [question['a'], question['b'], question['c'], question['d']]
+
+            # Get current answer
             current_answer = st.session_state.quiz['answers'].get(q_num)
 
             # Show radio buttons
-            options = [question['a'], question['b'], question['c'], question['d']]
             user_choice = st.radio(
                 "Select your answer:",
                 options,
                 key=f"q_{q_num}",
-                index=options.index(current_answer) if current_answer is not None else None
+                index=options.index(current_answer) if current_answer in options else None
             )
 
             # Store answer if changed
             if user_choice and user_choice != current_answer:
                 st.session_state.quiz['answers'][q_num] = user_choice
-                if not st.session_state.quiz['submitted']:
-                    st.rerun()
+                st.rerun()
 
-            # Show correct answer after submission
+            # Check if all questions answered
+            if st.session_state.quiz['answers'].get(q_num) is None:
+                all_answered = False
+
+            # Show feedback after submission
             if st.session_state.quiz['submitted']:
                 correct_answer = question[question['answer_key']]
                 if st.session_state.quiz['answers'][q_num] == correct_answer:
                     st.success("✓ Correct!")
                 else:
-                    st.error(f"Correct answer: {correct_answer}")
+                    st.error(f"✗ Incorrect. The correct answer is: {correct_answer}")
 
-        # Action buttons
+        # Submit or Reset buttons
         col1, col2 = st.columns(2)
         with col1:
-            if not st.session_state.quiz['submitted'] and any(st.session_state.quiz['answers'].values()):
-                if st.button("Submit Answers"):
+            if not st.session_state.quiz['submitted']:
+                if st.button("Submit Answers", disabled=not all_answered):
                     st.session_state.quiz['submitted'] = True
                     st.rerun()
         with col2:
@@ -756,7 +795,8 @@ def pdf2quiz():
                     'data': None,
                     'answers': {},
                     'submitted': False,
-                    'file_processed': None
+                    'file_processed': None,
+                    'file_type': None
                 }
                 st.rerun()
 
@@ -767,7 +807,6 @@ def pdf2quiz():
                 if st.session_state.quiz['answers'][q_num] == question[question['answer_key']]
             )
             st.success(f"Your score: {score}/{len(st.session_state.quiz['data'])}")
-
 
 pg = st.navigation(
     [st.Page(esma, title="Essay Maker"), st.Page(tetos, title="Text To Speech"), st.Page(aito, title="AITO"),st.Page(pdf2quiz, title="Pdf to Quiz") ])
