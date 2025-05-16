@@ -1,5 +1,7 @@
 import streamlit as st
 import tempfile
+
+from attr import NothingType
 from openai import OpenAI
 import edge_tts
 import asyncio
@@ -742,7 +744,8 @@ def pdf2quiz():
 
     # Display the quiz if generated
     if st.session_state.quiz['data']:
-        st.subheader(f"Quiz Generated from {st.session_state.quiz['file_type']}")
+        st.subheader(f"Quiz Generated from {st.session_state.quiz.get('file_type', 'Unknown Type')}")
+
         st.write(f"File: {st.session_state.quiz['file_processed'].name}")
 
         # Track if all questions have been answered
@@ -809,7 +812,7 @@ def pdf2quiz():
             st.success(f"Your score: {score}/{len(st.session_state.quiz['data'])}")
 
 pg = st.navigation(
-    [st.Page(esma, title="Essay Maker"), st.Page(tetos, title="Text To Speech"), st.Page(aito, title="AITO"),st.Page(pdf2quiz, title="Pdf to Quiz") ])
+    [st.Page(main_page, title="Essay Maker"), st.Page(esma, title="Essay Maker"), st.Page(tetos, title="Text To Speech"), st.Page(aito, title="AITO"),st.Page(pdf2quiz, title="Pdf to Quiz") ])
 pg.run()
 
 
