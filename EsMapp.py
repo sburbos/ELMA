@@ -15,7 +15,7 @@ st.set_page_config(
     page_icon=":writing_hand:",
     layout="wide"
 )
-st.logo("logo 1.png", icon_image="logo 4.png")
+st.logo("logo 1.png", icon_image="logo 4.png", size = "medium")
 def main_page():
     st.markdown("""
     <style>
