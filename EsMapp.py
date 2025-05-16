@@ -18,194 +18,96 @@ st.set_page_config(
 )
 st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 def main_page():
-    st.markdown("""
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@700&display=swap');
+    try:
+        st.markdown("""
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@700&display=swap');
 
-        /* Base styling */
-        html, body, .stApp {
-            overflow: hidden !important;
-            height: 100vh;
-            width: 100vw;
-            margin: 0;
-            padding: 0;
-            background: #000;
-        }
+            body, .stApp {
+                overflow: hidden;
+                height: 100vh;
+                margin: 0;
+                padding: 0;
+                background: #000;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
 
-        /* Main container */
-        .futur-container {
-            height: 100vh;
-            width: 100vw;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            position: fixed;
-            top: 0;
-            left: 0;
-        }
-
-        /* Futuristic text */
-        .futur-text {
-            font-family: 'Chakra Petch', sans-serif;
-            font-size: 8rem;
-            font-weight: 700;
-            color: transparent;
-            background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%);
-            -webkit-background-clip: text;
-            background-clip: text;
-            position: relative;
-            text-transform: uppercase;
-            letter-spacing: 0.5rem;
-        }
-
-        /* Holographic effect */
-        .futur-text::before {
-            content: 'Lley';
-            position: absolute;
-            top: 0;
-            left: 0;
-            color: transparent;
-            background: linear-gradient(90deg, #ff00cc 0%, #333399 100%);
-            -webkit-background-clip: text;
-            background-clip: text;
-            z-index: -1;
-            animation: hologram 3s ease-in-out infinite alternate;
-        }
-
-        @keyframes hologram {
-            0% { transform: translate(0, 0); opacity: 0.8; }
-            25% { transform: translate(5px, 2px); }
-            50% { transform: translate(-3px, 4px); }
-            75% { transform: translate(2px, -3px); }
-            100% { transform: translate(-5px, 1px); opacity: 0.3; }
-        }
-
-        /* Grid lines animation */
-        .grid-line {
-            position: absolute;
-            background: rgba(0, 210, 255, 0.1);
-            animation: grid-fade 6s ease-in-out infinite;
-        }
-
-        @keyframes grid-fade {
-            0%, 100% { opacity: 0.05; }
-            50% { opacity: 0.2; }
-        }
-
-        /* Digital particles */
-        .particle {
-            position: absolute;
-            color: #00d2ff;
-            font-family: monospace;
-            animation: particle-fall linear infinite;
-            opacity: 0;
-        }
-
-        @keyframes particle-fall {
-            0% { transform: translateY(-100vh); opacity: 0; }
-            10% { opacity: 0.8; }
-            90% { opacity: 0.8; }
-            100% { transform: translateY(100vh); opacity: 0; }
-        }
-
-        /* Responsive adjustments */
-        @media (max-width: 768px) {
             .futur-text {
-                font-size: 4rem;
-                letter-spacing: 0.3rem;
-            }
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # JavaScript for advanced effects
-    html("""
-    <script>
-        // Create grid lines
-        function createGrid() {
-            const container = document.querySelector('.futur-container');
-            const lineCount = 20;
-
-            // Vertical lines
-            for (let i = 0; i < lineCount; i++) {
-                const line = document.createElement('div');
-                line.classList.add('grid-line');
-                line.style.width = '1px';
-                line.style.height = '100vh';
-                line.style.left = `${(i / lineCount) * 100}vw`;
-                line.style.animationDelay = `${Math.random() * 6}s`;
-                container.appendChild(line);
+                font-family: 'Chakra Petch', sans-serif;
+                font-size: 8rem;
+                font-weight: 700;
+                color: #00d2ff;
+                text-transform: uppercase;
+                letter-spacing: 0.5rem;
+                text-shadow: 0 0 10px rgba(0, 210, 255, 0.7);
+                animation: pulse 3s ease-in-out infinite;
+                position: relative;
             }
 
-            // Horizontal lines
-            for (let i = 0; i < lineCount; i++) {
-                const line = document.createElement('div');
-                line.classList.add('grid-line');
-                line.style.width = '100vw';
-                line.style.height = '1px';
-                line.style.top = `${(i / lineCount) * 100}vh`;
-                line.style.animationDelay = `${Math.random() * 6}s`;
-                container.appendChild(line);
+            @keyframes pulse {
+                0%, 100% { opacity: 0.9; text-shadow: 0 0 10px rgba(0, 210, 255, 0.7); }
+                50% { opacity: 1; text-shadow: 0 0 20px rgba(0, 210, 255, 0.9); }
             }
-        }
 
-        // Create digital particles
-        function createParticles() {
-            const container = document.querySelector('.futur-container');
-            const particleCount = 30;
-            const chars = ['0', '1', '⎔', '⊞', '⎅', '⌾', '⍟'];
-
-            for (let i = 0; i < particleCount; i++) {
-                const particle = document.createElement('div');
-                particle.classList.add('particle');
-                particle.textContent = chars[Math.floor(Math.random() * chars.length)];
-
-                // Random properties
-                const left = Math.random() * 100;
-                const duration = 5 + Math.random() * 10;
-                const delay = Math.random() * 15;
-                const size = 10 + Math.random() * 20;
-                const blur = Math.random() * 3;
-
-                particle.style.left = `${left}vw`;
-                particle.style.fontSize = `${size}px`;
-                particle.style.filter = `blur(${blur}px)`;
-                particle.style.animationDuration = `${duration}s`;
-                particle.style.animationDelay = `${delay}s`;
-
-                container.appendChild(particle);
+            @media (max-width: 768px) {
+                .futur-text {
+                    font-size: 4rem;
+                }
             }
-        }
+        </style>
+        """, unsafe_allow_html=True)
 
-        // Initialize effects
-        document.addEventListener('DOMContentLoaded', function() {
-            createGrid();
-            createParticles();
+        # Minimal JavaScript with error handling
+        try:
+            html("""
+            <script>
+                // Disable scrolling
+                document.body.style.overflow = 'hidden';
+                window.addEventListener('scroll', function() {
+                    window.scrollTo(0, 0);
+                });
 
-            // Disable scrolling
-            window.scrollTo(0, 0);
-            document.body.style.overflow = 'hidden';
+                // Simple cursor trail effect
+                document.addEventListener('mousemove', function(e) {
+                    const dot = document.createElement('div');
+                    dot.style.position = 'absolute';
+                    dot.style.width = '6px';
+                    dot.style.height = '6px';
+                    dot.style.backgroundColor = 'rgba(0, 210, 255, 0.5)';
+                    dot.style.borderRadius = '50%';
+                    dot.style.left = e.clientX + 'px';
+                    dot.style.top = e.clientY + 'px';
+                    dot.style.pointerEvents = 'none';
+                    dot.style.zIndex = '9999';
+                    document.body.appendChild(dot);
 
-            // Prevent touch scrolling
-            document.addEventListener('touchmove', function(e) {
-                e.preventDefault();
-            }, { passive: false });
-        });
+                    // Fade out and remove
+                    setTimeout(() => {
+                        dot.style.transition = 'all 0.5s ease';
+                        dot.style.opacity = '0';
+                        dot.style.transform = 'scale(2)';
+                        setTimeout(() => dot.remove(), 500);
+                    }, 100);
+                });
+            </script>
+            """)
+        except Exception as e:
+            st.error("Could not load interactive elements")
+            print(f"JavaScript error: {e}")
 
-        // Lock scroll position
-        document.addEventListener('scroll', function() {
-            window.scrollTo(0, 0);
-        });
-    </script>
-    """)
+        # Display the text
+        st.markdown('<div class="futur-text">Lley</div>', unsafe_allow_html=True)
 
-    # Futuristic Lley display
-    st.markdown("""
-    <div class="futur-container">
-        <div class="futur-text">Lley</div>
-    </div>
-    """, unsafe_allow_html=True)
-
+    except Exception as e:
+        st.error("An error occurred while rendering the page")
+        print(f"Rendering error: {e}")
+        st.markdown("""
+        <div style="font-family: sans-serif; color: white; text-align: center;">
+            <h1>Lley</h1>
+        </div>
+        """, unsafe_allow_html=True)
 # Debug: Show loaded secrets (remove after testing)
 
 def esma():
