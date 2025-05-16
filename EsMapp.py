@@ -18,89 +18,104 @@ st.set_page_config(
 def main_page():
     st.markdown("""
     <style>
-        /* Remove default Streamlit elements */
-        .stApp {
-            background: #000000;
-            padding: 0 !important;
+        /* Disable all scrolling */
+        html, body, .stApp {
+            overflow: hidden !important;
+            height: 100vh !important;
+            width: 100vw !important;
             margin: 0 !important;
+            padding: 0 !important;
         }
 
-        /* Main container */
-        .main-container {
+        /* Main container - fills entire viewport */
+        .static-container {
             height: 100vh;
+            width: 100vw;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            background: linear-gradient(-45deg, #000000, #111111, #222222, #000000);
-            background-size: 400% 400%;
-            animation: gradientBG 15s ease infinite;
-            color: white;
-        }
-
-        /* Background animation */
-        @keyframes gradientBG {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-
-        /* Name animation */
-        @keyframes glow {
-            0% { text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #0073e6, 0 0 20px #0073e6; }
-            50% { text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #0073e6, 0 0 40px #0073e6; }
-            100% { text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #0073e6, 0 0 20px #0073e6; }
-        }
-
-        /* Letter animations */
-        @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-20px); }
+            background: #000000;
+            position: fixed;
+            top: 0;
+            left: 0;
         }
 
         /* Name styling */
         .name {
-            font-family: 'Arial', sans-serif;
-            font-size: 20rem;
-            font-weight: 700;
-            animation: glow 3s ease-in-out infinite;
+            font-family: 'Arial Black', sans-serif;
+            font-size: 8rem;
+            font-weight: 900;
+            color: white;
+            text-align: center;
             margin: 0;
             padding: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5rem;
         }
 
-        /* Individual letter styling */
-        .letter {
-            display: inline-block;
-            animation: float 4s ease-in-out infinite;
+        /* Simple underline animation */
+        .underline {
+            height: 4px;
+            width: 0;
+            background: white;
+            margin: 1rem auto;
+            animation: expand 2s ease-out forwards;
+            animation-delay: 0.5s;
         }
 
-        /* Different delays for each letter */
-        .l1 { animation-delay: 0.1s; }
-        .l2 { animation-delay: 0.2s; }
-        .e { animation-delay: 0.3s; }
-        .y { animation-delay: 0.4s; }
+        @keyframes expand {
+            from { width: 0; }
+            to { width: 80%; }
+        }
 
-        /* Subtle footer */
+        /* Subtle footer - absolutely positioned */
         .footer {
             position: absolute;
-            bottom: 20px;
-            color: rgba(255,255,255,0.3);
+            bottom: 2rem;
+            color: rgba(255,255,255,0.5);
             font-size: 0.8rem;
-            animation: fadeIn 5s;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+            letter-spacing: 0.1rem;
         }
 
         /* Responsive adjustments */
         @media (max-width: 768px) {
             .name {
-                font-size: 4rem;
+                font-size: 3rem;
+                letter-spacing: 0.2rem;
             }
         }
     </style>
+    """, unsafe_allow_html=True)
+
+    # JavaScript to ensure no scrolling can occur
+    html("""
+    <script>
+        // Lock scroll position on load
+        document.addEventListener('DOMContentLoaded', function() {
+            window.scrollTo(0, 0);
+            document.body.style.overflow = 'hidden';
+        });
+
+        // Prevent any scrolling attempts
+        document.addEventListener('scroll', function(e) {
+            window.scrollTo(0, 0);
+        });
+
+        // Prevent touch scrolling on mobile
+        document.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+    </script>
+    """)
+
+    # Static content - just the name
+    st.markdown("""
+    <div class="static-container">
+        <h1 class="name">Lley</h1>
+        <div class="underline"></div>
+        <div class="footer">EST. 2023</div>
+    </div>
     """, unsafe_allow_html=True)
 
     # JavaScript for additional effects
