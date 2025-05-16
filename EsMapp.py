@@ -17,10 +17,19 @@ st.set_page_config(
 )
 st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 def main_page():
-    video_file = open("final.mp4", "rb")
-    video_bytes = video_file.read()
-    st.video(video_bytes, loop = True, autoplay = True)
+    with open("4kvid.mp4.lottie.json", "r") as f:
+        lottie_json = json.load(f)
 
+    # Display the animation
+    st_lottie(
+        lottie_json,
+        speed=1,
+        loop=True,
+        quality="high",
+        height=300,
+        width=300,
+        key="home_animation"
+    )
 
 
 # Debug: Show loaded secrets (remove after testing)
