@@ -692,6 +692,8 @@ def extract_pptx_text(pptx_file):
     except Exception as h:
         st.error(f"Error reading PPTX: {str(h)}")
         return None
+
+
 def pdf2quiz():
     # System prompts for different quiz types
     system_condition_mcq = """You are a system only for creating a multiple choice quiz python dictionary. 
@@ -816,14 +818,26 @@ def pdf2quiz():
 
                     if content_out:
                         try:
-                            # Clean the output
+                            # Clean the output by removing markdown code blocks
                             clean_output = content_out.strip()
+
+                            # Remove starting and ending code blocks
                             if clean_output.startswith("```python"):
                                 clean_output = clean_output[9:]
-                            if clean_output.startswith("```"):
+                            elif clean_output.startswith("```json"):
+                                clean_output = clean_output[7:]
+                            elif clean_output.startswith("```"):
                                 clean_output = clean_output[3:]
+
                             if clean_output.endswith("```"):
                                 clean_output = clean_output[:-3]
+
+                            # Remove any remaining whitespace
+                            clean_output = clean_output.strip()
+
+                            # Debug: Show cleaned output
+                            st.text("Cleaned output:")
+                            st.code(clean_output)
 
                             # Convert to dictionary
                             quiz_data = ast.literal_eval(clean_output)
@@ -844,6 +858,8 @@ def pdf2quiz():
                             st.error(f"Error processing quiz: {str(j)}")
                             st.text("Raw AI output:")
                             st.code(content_out)
+                            st.text("Cleaned output:")
+                            st.code(clean_output)
                 else:
                     st.warning(extracted_text or "Could not extract text from the file")
 
