@@ -718,30 +718,18 @@ def pdf2quiz():
                             "1": {
                                 "question": "Question text",
                                 "type": "definition/enumeration/essay",
-                                "model_answer": "The ideal answer that would score 10/10",
-                                "scoring_criteria": ["Key point 1", "Key point 2", "Key point 3"]
+                                "model_answer": "The ideal answer that would score 10/10"
                             },
                             ...
-                        }
-                        Important rules:
-                        1. ALWAYS include a detailed model_answer that would score 10/10
-                        2. Include specific scoring_criteria that should be present in a good answer
-                        3. Questions should require thoughtful responses, not just one-word answers
-                        4. Make sure model answers are directly based on the provided text content"""
+                        }"""
 
-    scoring_system = """You are an expert grader. Evaluate the student's answer based on the model answer and scoring criteria.
-                        Score each answer from 1-10 based on:
-                        - Accuracy (how correct the information is)
-                        - Completeness (how many key points are covered)
-                        - Relevance (how well it addresses the question)
-                        - Clarity (how well it's expressed)
-
+    scoring_system = """You are an expert grader. Evaluate the student's answer based on the model answer.
+                        Score each answer from 1-10 based on accuracy, completeness and relevance.
                         Provide a brief explanation for your scoring.
                         Return ONLY a Python dictionary with this format:
                         {
-                            "score": x (between 1-10),
-                            "explanation": "Brief explanation of the score",
-                            "feedback": "Specific suggestions for improvement"
+                            "score": x,
+                            "explanation": "Brief explanation of the score"
                         }"""
 
     # Initialize session state
@@ -818,10 +806,7 @@ def pdf2quiz():
                     else:
                         full_prompt = f"""Create an open-ended quiz based on the following text. 
                         Generate {number_quiz} questions that require definition, enumeration, or essay answers.
-                        For each question:
-                        - Provide a detailed model answer that would score 10/10
-                        - Include specific scoring criteria (3-5 key points)
-                        - Ensure questions require thoughtful responses
+                        For each question, provide a model answer that would score 10/10.
                         Return ONLY the Python dictionary in the specified format.
                         {extra_prompt if toggle_swap else ''}
 
@@ -833,48 +818,17 @@ def pdf2quiz():
 
                     if content_out:
                         try:
-                            # Clean the output by removing markdown code blocks
+                            # Clean the output
                             clean_output = content_out.strip()
-
-                            # Remove starting and ending code blocks
                             if clean_output.startswith("```python"):
                                 clean_output = clean_output[9:]
-                            elif clean_output.startswith("```json"):
-                                clean_output = clean_output[7:]
-                            elif clean_output.startswith("```"):
+                            if clean_output.startswith("```"):
                                 clean_output = clean_output[3:]
-
                             if clean_output.endswith("```"):
                                 clean_output = clean_output[:-3]
 
-                            # Remove any remaining whitespace
-                            clean_output = clean_output.strip()
-
                             # Convert to dictionary
                             quiz_data = ast.literal_eval(clean_output)
-
-                            # For open-ended questions, ensure each question has required fields
-                            if st.session_state.quiz['quiz_type'] == 'open_ended':
-                                for q_num, question in quiz_data.items():
-                                    if 'model_answer' not in question:
-                                        # If no model answer, generate one from the text
-                                        model_prompt = f"""Based on this text, create a model answer for this question:
-                                        Question: {question['question']}
-                                        Text: {extracted_text[:5000]}
-
-                                        Return ONLY the model answer that would score 10/10."""
-                                        question['model_answer'] = ai_assistant(model_prompt,
-                                                                                "You create perfect model answers") or "No model answer could be generated"
-
-                                    if 'scoring_criteria' not in question:
-                                        # Generate scoring criteria if missing
-                                        criteria_prompt = f"""Create 3-5 scoring criteria for evaluating answers to this question:
-                                        Question: {question['question']}
-                                        Model Answer: {question.get('model_answer', '')}
-
-                                        Return ONLY a Python list of criteria."""
-                                        question['scoring_criteria'] = ast.literal_eval(
-                                            ai_assistant(criteria_prompt, "You create scoring criteria") or "[]")
 
                             # Update session state
                             st.session_state.quiz = {
@@ -892,8 +846,6 @@ def pdf2quiz():
                             st.error(f"Error processing quiz: {str(j)}")
                             st.text("Raw AI output:")
                             st.code(content_out)
-                            st.text("Cleaned output:")
-                            st.code(clean_output)
                 else:
                     st.warning(extracted_text or "Could not extract text from the file")
 
@@ -961,17 +913,8 @@ def pdf2quiz():
                         score_data = st.session_state.quiz['scores'][q_num]
                         st.markdown(f"**Score: {score_data['score']}/10**")
                         st.markdown(f"**Explanation:** {score_data['explanation']}")
-                        if 'feedback' in score_data:
-                            st.markdown(f"**Feedback:** {score_data['feedback']}")
-
-                        with st.expander("View Model Answer and Criteria"):
-                            st.markdown("**Model Answer:**")
-                            st.info(question.get('model_answer', 'No model answer provided'))
-
-                            if 'scoring_criteria' in question and question['scoring_criteria']:
-                                st.markdown("**Scoring Criteria:**")
-                                for criterion in question['scoring_criteria']:
-                                    st.markdown(f"- {criterion}")
+                        st.markdown("**Model Answer:**")
+                        st.info(question['model_answer'])
 
         # Submit or Reset buttons
         col1, col2 = st.columns(2)
@@ -984,32 +927,19 @@ def pdf2quiz():
                             scores = {}
                             for q_num, question in st.session_state.quiz['data'].items():
                                 user_answer = st.session_state.quiz['answers'][q_num]
-                                criteria = "\n".join([f"- {c}" for c in question.get('scoring_criteria', [])])
-
                                 prompt = f"""
-                                Question: {question['question']}
-                                Model Answer: {question.get('model_answer', 'No model answer provided')}
-                                Scoring Criteria:
-                                {criteria}
+                                Model Answer: {question['model_answer']}
                                 Student Answer: {user_answer}
 
-                                Evaluate the student's answer based on the above information.
-                                Return ONLY a Python dictionary with this format:
-                                {{
-                                    "score": x (between 1-10),
-                                    "explanation": "Brief explanation of the score",
-                                    "feedback": "Specific suggestions for improvement"
-                                }}
+                                Evaluate the student's answer based on the model answer.
+                                Score from 1-10 based on accuracy, completeness and relevance.
+                                Provide a brief explanation for your scoring.
                                 """
                                 score_data = ai_assistant(prompt, scoring_system)
                                 try:
                                     scores[q_num] = ast.literal_eval(score_data.strip())
-                                except Exception as e:
-                                    scores[q_num] = {
-                                        "score": 0,
-                                        "explanation": f"Evaluation failed: {str(e)}",
-                                        "feedback": "Please check your answer format"
-                                    }
+                                except:
+                                    scores[q_num] = {"score": 0, "explanation": "Could not evaluate this answer"}
                             st.session_state.quiz['scores'] = scores
 
                     st.session_state.quiz['submitted'] = True
