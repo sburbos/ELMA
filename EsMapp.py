@@ -3,6 +3,7 @@ import streamlit as st
 import tempfile
 from attr import NothingType
 from openai import OpenAI
+import google.generativeai as genai
 import edge_tts
 import asyncio
 import PyPDF2
@@ -31,110 +32,48 @@ import requests
 
 
 def ai_assistant(prompt, rule):
-    """Enhanced AI assistant function for Google Gemini API with multiple fallback keys"""
+    """Properly configured Gemini AI assistant function"""
     try:
-        # Validate API keys
-        if "openrouter" not in st.secrets or "API_KEYS" not in st.secrets.openrouter:
-            st.error("🚫 API keys not found in Streamlit secrets")
+        # Validate API key
+        if "google" not in st.secrets or "API_KEY" not in st.secrets.google:
+            st.error("🚫 Google API key not found in Streamlit secrets")
             return None
 
-        keys = st.secrets.openrouter.API_KEYS
-        if not isinstance(keys, list) or len(keys) == 0:
-            st.error("🚫 No valid API keys provided")
-            return None
+        api_key = st.secrets.google.API_KEY
 
-        # Gemini API endpoint
-        base_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+        # Configure the Gemini client
+        genai.configure(api_key=api_key)
 
-        # Prepare messages based on input type
+        # Initialize the model
+        model = genai.GenerativeModel('gemini-pro')
+
+        # Format the prompt based on input type
         if isinstance(prompt, list):
-            # Convert chat history to Gemini format
-            contents = []
+            # Convert chat history to Gemini's format
+            messages = []
             for msg in prompt:
                 if msg["role"] == "system":
-                    contents.append({"role": "model", "parts": [{"text": msg["content"]}]})
+                    messages.append({"role": "model", "parts": [{"text": msg["content"]}]})
                 else:
-                    contents.append({"role": "user", "parts": [{"text": msg["content"]}]})
+                    messages.append({"role": "user", "parts": [{"text": msg["content"]}]})
+
+            # Start a chat session if we have history
+            chat = model.start_chat(history=messages)
+            response = chat.send_message(rule if rule else "Respond to the user")
         else:
-            # Single prompt with system instruction
-            contents = [{
-                "role": "user",
-                "parts": [{"text": f"{rule}\n\n{prompt}"}]
-            }]
+            # For single prompts, combine with rule if provided
+            full_prompt = f"{rule}\n\n{prompt}" if rule else prompt
+            response = model.generate_content(full_prompt)
 
-        # Request configuration
-        data = {
-            "contents": contents,
-            "generationConfig": {
-                "maxOutputTokens": 2048,
-                "temperature": 0.7,
-                "topK": 40,
-                "topP": 0.95
-            },
-            "safetySettings": [
-                {
-                    "category": "HARM_CATEGORY_HARASSMENT",
-                    "threshold": "BLOCK_ONLY_HIGH"
-                },
-                {
-                    "category": "HARM_CATEGORY_HATE_SPEECH",
-                    "threshold": "BLOCK_ONLY_HIGH"
-                }
-            ]
-        }
-
-        # Try each key until success
-        for key in keys:
-            try:
-                headers = {
-                    "Authorization": f"Bearer {key}",
-                    "Content-Type": "application/json",
-                    "X-Referer": "https://lley-ai.streamlit.app/",
-                    "X-Title": "LleY Ai"
-                }
-
-                with st.spinner("Generating response..."):
-                    response = requests.post(
-                        base_url,
-                        headers=headers,
-                        json=data,
-                        timeout=30  # 30-second timeout
-                    )
-
-                # Process successful response
-                if response.status_code == 200:
-                    try:
-                        return response.json()["candidates"][0]["content"]["parts"][0]["text"]
-                    except (KeyError, IndexError) as e:
-                        st.warning(f"⚠️ Unexpected response format from key ...{key[-4:]}")
-                        continue
-
-                # Handle rate limits
-                elif response.status_code == 429:
-                    st.warning(f"⚠️ API key ending in ...{key[-4:]} rate limited. Trying next...")
-                    continue
-
-                # Handle other HTTP errors
-                else:
-                    error_msg = response.json().get("error", {}).get("message", "Unknown error")
-                    st.warning(f"⚠️ Key ...{key[-4:]} failed (HTTP {response.status_code}): {error_msg}")
-                    continue
-
-            except requests.exceptions.Timeout:
-                st.warning(f"⚠️ Timeout with key ...{key[-4:]}. Trying next...")
-                continue
-            except requests.exceptions.RequestException as e:
-                st.warning(f"⚠️ Network error with key ...{key[-4:]}: {str(e)}")
-                continue
-            except Exception as e:
-                st.warning(f"⚠️ Unexpected error with key ...{key[-4:]}: {str(e)}")
-                continue
-
-        st.error("🚫 All API keys failed. Please try again later or check your API keys.")
-        return None
+        # Return the text response
+        if response and response.text:
+            return response.text
+        else:
+            st.warning("🚫 No response from the model")
+            return None
 
     except Exception as e:
-        st.error(f"🚫 Critical error in AI assistant: {str(e)}")
+        st.error(f"🚫 An error occurred: {str(e)}")
         return None
 
 
