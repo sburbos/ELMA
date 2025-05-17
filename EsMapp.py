@@ -2,7 +2,6 @@
 import streamlit as st
 import tempfile
 from attr import NothingType
-from openai import OpenAI
 import edge_tts
 import asyncio
 import PyPDF2
@@ -15,6 +14,7 @@ import numpy as np
 from difflib import SequenceMatcher
 import os
 import requests
+import google.generativeai as genai
 
 # Initialize the OpenAI client with proper configuration
 
@@ -30,46 +30,38 @@ st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 import requests
 
 def ai_assistant(prompt, rule):
-    keys = st.secrets.openrouter.API_KEYS
-    base_url = "https://openrouter.ai/api/v1/chat/completions"
+    genai.configure(api_key=st.secrets.google.API_KEY)  # Use Streamlit secrets
 
-    for key in keys:
-        try:
-            headers = {
-                "Authorization": f"Bearer {key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://lley-ai.streamlit.app/",
-                "X-Title": "LleY Ai"
-            }
+    model = genai.GenerativeModel('gemini-pro')  # Or specify your model
 
-            messages = prompt if isinstance(prompt, list) else [
-                {"role": "system", "content": rule},
-                {"role": "user", "content": prompt}
-            ]
+    messages = prompt if isinstance(prompt, list) else [
+        {"role": "system", "content": rule},
+        {"role": "user", "content": prompt}
+    ]
 
-            data = {
-                "model": "nousresearch/deephermes-3-mistral-24b-preview:free",
-                "messages": messages,
-                "max_tokens": 2048
-            }
+    try:
+        if isinstance(prompt, list):
+          full_prompt = ""
+          for message in messages:
+            if message["role"] == "system":
+              full_prompt += f" {message['content']} "
+            elif message["role"] == "user":
+              full_prompt += f" {message['content']} "
+            elif message["role"] == "assistant":
+              full_prompt += f" {message['content']} "
+          response = model.generate_content(full_prompt)
+        else:
+          response = model.generate_content(rule + " " + prompt)
 
-            response = requests.post(base_url, headers=headers, json=data)
+        if response.text:
+            return response.text
+        else:
+            st.warning("🚫  No response from the model.")
+            return None
 
-            if response.status_code == 200:
-                return response.json()["choices"][0]["message"]["content"]
-            elif response.status_code == 429:
-                st.warning(f"⚠️ API key ending in ...{key[-4:]} hit rate limit. Trying next key...")
-                continue  # Try the next key
-            else:
-                continue
-
-        except Exception as e:
-            st.warning(f"⚠️ Failed with key ...{key[-4:]}, trying next. Error: {e}")
-            continue
-
-    st.error("🚫 All API keys failed or exceeded their limits.")
-    return None
-
+    except Exception as e:
+        st.error(f"🚫 An error occurred: {e}")
+        return None
 
 
 def main_page():
