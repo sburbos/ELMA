@@ -49,11 +49,11 @@ except AttributeError as e:
 except Exception as d:
     st.error(f"API connection failed: {str(d)}")
     st.stop()
-
+#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
 def ai_assistant(prompt, rule):
     try:
         response = client.chat.completions.create(
-            model="nousresearch/deephermes-3-mistral-24b-preview:free",
+            model="qwen/qwen3-235b-a22b:free",
             extra_headers={
                 "HTTP-Referer": "https://lley-ai.streamlit.app/",  # Optional. Site URL for rankings on openrouter.ai.
                 "X-Title": "LleY Ai",  # Optional. Site title for rankings on openrouter.ai.
