@@ -18,6 +18,34 @@ st.set_page_config(
     layout="wide"
 )
 
+try:
+    # Access nested secrets
+    api_key = st.secrets.openrouter.OPENAI_API_KEY
+    base_url = st.secrets.openrouter.OPENAI_BASE_URL
+
+    client = OpenAI(
+        api_key=api_key,
+        base_url=base_url
+    )
+
+    # Test connection
+    client.models.list()
+
+except AttributeError as e:
+    st.error(f"""
+    Secret configuration error: {str(e)}
+    Current secret structure: {dict(st.secrets)}
+    Required structure:
+    ```
+    [openrouter]
+    OPENAI_API_KEY = "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"
+    OPENAI_BASE_URL = "https://openrouter.ai/api/v1"
+    ```
+    """)
+    st.stop()
+except Exception as d:
+    st.error(f"API connection failed: {str(d)}")
+    st.stop()
 
 def ai_assistant(prompt, rule):
     try:
@@ -185,34 +213,6 @@ def main_page():
 # Debug: Show loaded secrets (remove after testing)
 
 def esma():
-    try:
-        # Access nested secrets
-        api_key = st.secrets.openrouter.OPENAI_API_KEY
-        base_url = st.secrets.openrouter.OPENAI_BASE_URL
-
-        client = OpenAI(
-            api_key=api_key,
-            base_url=base_url
-        )
-
-        # Test connection
-        client.models.list()
-
-    except AttributeError as e:
-        st.error(f"""
-        Secret configuration error: {str(e)}
-        Current secret structure: {dict(st.secrets)}
-        Required structure:
-        ```
-        [openrouter]
-        OPENAI_API_KEY = "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"
-        OPENAI_BASE_URL = "https://openrouter.ai/api/v1"
-        ```
-        """)
-        st.stop()
-    except Exception as d:
-        st.error(f"API connection failed: {str(d)}")
-        st.stop()
 
     # Rest of your app...
 
@@ -640,35 +640,6 @@ def tetos():
 
 
 def aito():
-    try:
-        # Access nested secrets
-        api_key = st.secrets.openrouter.OPENAI_API_KEY
-        base_url = st.secrets.openrouter.OPENAI_BASE_URL
-
-        client = OpenAI(
-            api_key=api_key,
-            base_url=base_url
-        )
-
-        # Test connection
-        client.models.list()
-
-    except AttributeError as e:
-        st.error(f"""
-        Secret configuration error: {str(e)}
-        Current secret structure: {dict(st.secrets)}
-        Required structure:
-        ```
-        [openrouter]
-        OPENAI_API_KEY = "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"
-        OPENAI_BASE_URL = "https://openrouter.ai/api/v1"
-        ```
-        """)
-        st.stop()
-    except Exception as d:
-        st.error(f"API connection failed: {str(d)}")
-        st.stop()
-
 
 
     st.title("AITO")
@@ -701,34 +672,6 @@ def aito():
 
 
 def pdf2quiz():
-    try:
-        # Access nested secrets
-        api_key = st.secrets.openrouter.OPENAI_API_KEY
-        base_url = st.secrets.openrouter.OPENAI_BASE_URL
-
-        client = OpenAI(
-            api_key=api_key,
-            base_url=base_url
-        )
-
-        # Test connection
-        client.models.list()
-
-    except AttributeError as e:
-        st.error(f"""
-        Secret configuration error: {str(e)}
-        Current secret structure: {dict(st.secrets)}
-        Required structure:
-        ```
-        [openrouter]
-        OPENAI_API_KEY = "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"
-        OPENAI_BASE_URL = "https://openrouter.ai/api/v1"
-        ```
-        """)
-        st.stop()
-    except Exception as d:
-        st.error(f"API connection failed: {str(d)}")
-        st.stop()
 
     def extract_pdf_text(pdf_file: str) -> str:
         try:
