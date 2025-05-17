@@ -1,9 +1,10 @@
 #google api key AIzaSyAI_nzXk4dW-VUxG7T23uB_Tm9WXT3ZQ1M
 import streamlit as st
-import openai 
+import openai
 import tempfile
 from attr import NothingType
 from openai import OpenAI
+import google.generativeai as genai
 import edge_tts
 import asyncio
 import PyPDF2
@@ -31,44 +32,85 @@ st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 
 
 def ai_assistant(prompt, rule):
-    """AI Assistant using Google Gemini API with OpenAI-compatible client"""
+    """Proper Google Gemini API implementation with correct endpoint"""
     try:
-        # Validate API key
+        # 1. Validate API key configuration
         if "google" not in st.secrets or "API_KEY" not in st.secrets.google:
-            st.error("🚫 Google API key not found in Streamlit secrets")
+            st.error("""
+            🚫 Configuration Missing:
+            Please add your Google API key to .streamlit/secrets.toml as:
+            [google]
+            API_KEY = "your_actual_api_key"
+            """)
             return None
 
-        # Initialize client with Google's endpoint
-        client = OpenAI(
+        # 2. Configure the API with the correct endpoint
+        genai.configure(
             api_key=st.secrets.google.API_KEY,
-            base_url="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+            transport='rest',  # Ensures we use proper REST endpoints
+            client_options={
+                'api_endpoint': 'https://generativelanguage.googleapis.com/v1beta/models'
+            }
         )
 
-        # Format messages
-        messages = prompt if isinstance(prompt, list) else [
-            {"role": "system", "content": rule},
-            {"role": "user", "content": prompt}
+        # 3. Initialize the model with proper configuration
+        generation_config = {
+            "temperature": 0.7,
+            "top_p": 1.0,
+            "top_k": 40,
+            "max_output_tokens": 2048,
+        }
+
+        safety_settings = [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_ONLY_HIGH"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
         ]
 
-        # Make the API call
-        response = client.chat.completions.create(
-            model="gemini-2.0-flash",
-            messages=messages,
-            max_tokens=2048,
-            temperature=0.7
+        model = genai.GenerativeModel(
+            'gemini-2.0-flash',  # Using the latest flash model
+            generation_config=generation_config,
+            safety_settings=safety_settings
         )
 
-        # Return the response
-        if response and response.choices:
-            return response.choices[0].message.content
+        # 4. Process the input and generate response
+        if isinstance(prompt, list):  # Chat history
+            # Convert to Gemini's expected format
+            history = []
+            for msg in prompt:
+                role = "model" if msg["role"] == "system" else "user"
+                history.append({"role": role, "parts": [{"text": msg["content"]}]})
+
+            # Start chat session
+            chat = model.start_chat(history=history)
+            response = chat.send_message(rule or "Respond to the user")
+        else:  # Single prompt
+            full_prompt = f"{rule}\n\n{prompt}" if rule else prompt
+            response = model.generate_content(full_prompt)
+
+        # 5. Return the response
+        if response and response.text:
+            return response.text
         else:
             st.warning("🚫 No response from the model")
             return None
 
-    except Exception as e:
-        st.error(f"🚫 An error occurred: {str(e)}")
+    except genai.types.BlockedPromptError as e:
+        st.error(f"🚫 Content blocked by safety filters: {str(e)}")
         return None
+    except Exception as e:
+        st.error(f"""
+        🚫 API Error:
+        {str(e)}
 
+        Troubleshooting:
+        1. Verify your API key is valid at https://aistudio.google.com/
+        2. Ensure you have quota for the Gemini API
+        3. Check your internet connection
+        4. Try again in a few minutes
+        """)
+        return None
 
 
 def main_page():
