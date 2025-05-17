@@ -31,28 +31,26 @@ st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 #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
 
 
-def ai_assistant(prompt, rule):
-    """Minimal Google Gemini API implementation that just returns the response"""
+def ai_assistant(prompt):
+    """Simple Gemini API implementation that just returns the response"""
     try:
-        # Configure API
+        # Configure API (using secrets)
         genai.configure(api_key=st.secrets.google.API_KEY)
 
-        # Initialize model
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        # Initialize model with latest version
+        model = genai.GenerativeModel("gemini-1.5-flash")
 
-        # Process input
+        # Handle both string prompts and chat history
         if isinstance(prompt, list):  # Chat history
             chat = model.start_chat(history=[])
-            if rule:
-                chat.send_message(rule)
+            response = None  # Initialize response variable
             for msg in prompt:
                 if msg["role"] == "user":
-                    responses = chat.send_message(msg["content"])
-            return response.text if hasattr(responses, 'text') else None
+                    response = chat.send_message(msg["content"])
+            return response.text if response and hasattr(response, 'text') else None
         else:  # Single prompt
-            full_prompt = f"{rule}\n\n{prompt}" if rule else prompt
-            responses = model.generate_content(full_prompt)
-            return response.text if hasattr(responses, 'text') else None
+            response = model.generate_content(prompt)
+            return response.text if hasattr(response, 'text') else None
 
     except Exception:
         return None
@@ -280,7 +278,7 @@ def esma():
                     else:
                         with st.spinner("Generating your essay..."):
                             full_prompt = f"Write a comprehensive {essay_type}, point of view: {selected_pov} point of view, education level: {level_essay}, language to use:{speech},  type of speech: {speech_type}, number of minimum words: {word_num}, essay about: {content_prompt}. With extra task {other_info_prompt}"
-                            essay = ai_assistant(full_prompt, condition_system)
+                            essay = ai_assistant(full_prompt)
                             if essay:
                                 right.text_area("Generated Essay", value=essay, height=680)
 
@@ -310,7 +308,7 @@ def esma():
                             and will portray a character: {selected_character}. With extra task {other_info_prompt}
 
 """
-                            content_out = ai_assistant(full_prompt, condition_system)
+                            content_out = ai_assistant(full_prompt)
                             if content_out:
                                 right.text_area("Generated Content", value=content_out, height=680)
 
@@ -648,7 +646,7 @@ def aito():
         st.chat_message("user").write(prompt)
 
         # Get AI response with full conversation history
-        response = ai_assistant(st.session_state.messages, rule=None)
+        response = ai_assistant(st.session_state.messages)
 
         if response:
             # Add AI response to chat history
@@ -804,7 +802,7 @@ def pdf2quiz():
                         {extracted_text[:10000]}"""
                         system_prompt = system_condition_open
 
-                    content_out = ai_assistant(full_prompt, system_prompt)
+                    content_out = ai_assistant(full_prompt)
 
                     if content_out:
                         try:
@@ -925,7 +923,7 @@ def pdf2quiz():
                                 Score from 1-10 based on accuracy, completeness and relevance.
                                 Provide a brief explanation for your scoring.
                                 """
-                                score_data = ai_assistant(prompt, scoring_system)
+                                score_data = ai_assistant(prompt)
                                 try:
                                     scores[q_num] = ast.literal_eval(score_data.strip())
                                 except:
@@ -990,7 +988,7 @@ def turnitin_knockoff():
     # Check if the AI assistant is working first
     def test_ai_assistant():
         try:
-            test_response = ai_assistant("Test - respond with 'OK'", "You are a test assistant")
+            test_response = ai_assistant("Test - respond with 'OK'")
             return test_response == "OK"
         except Exception as e:
             st.error(f"AI connection test failed: {str(e)}")
@@ -1051,7 +1049,7 @@ def turnitin_knockoff():
     if st.button("Run Originality Check"):
         with st.spinner("Analyzing content..."):
             # First try a simple test query to verify the AI is responding
-            test_result = ai_assistant("Test query - respond with 'READY'", "You are a test assistant")
+            test_result = ai_assistant("Test query - respond with 'READY'")
             if test_result != "READY":
                 st.error("The AI assistant is not responding properly. Analysis cannot proceed.")
                 return
@@ -1079,7 +1077,7 @@ def turnitin_knockoff():
                 }}
                 """
 
-                ai_result = ai_assistant(ai_prompt, "You are an AI content detector. Return ONLY valid JSON.")
+                ai_result = ai_assistant(ai_prompt)
                 if not ai_result:
                     raise ValueError("No response received from AI assistant")
 
@@ -1160,7 +1158,7 @@ def turnitin_knockoff():
                 }}
                 """
 
-                plag_result = ai_assistant(plag_prompt, "You are a plagiarism detector. Return ONLY valid JSON.")
+                plag_result = ai_assistant(plag_prompt)
                 if not plag_result:
                     raise ValueError("No response received from AI assistant")
 
@@ -1257,7 +1255,7 @@ def turnitin_knockoff():
                 }}
                 """
 
-                sim_result = ai_assistant(sim_prompt, "You analyze text repetition. Return ONLY valid JSON.")
+                sim_result = ai_assistant(sim_prompt)
                 if not sim_result:
                     raise ValueError("No response received from AI assistant")
 
@@ -1319,7 +1317,7 @@ def turnitin_knockoff():
                 }}
                 """
 
-                style_result = ai_assistant(style_prompt, "You analyze writing style. Return ONLY valid JSON.")
+                style_result = ai_assistant(style_prompt)
                 if not style_result:
                     raise ValueError("No response received from AI assistant")
 
