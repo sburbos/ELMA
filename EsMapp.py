@@ -736,6 +736,8 @@ def pdf2quiz():
                         - Relevance (how well it addresses the question)
                         - Clarity (how well it's expressed)
                         -As long as the answer has a point to think off then score something but not a perfect score
+                        
+                        -Strictl,y it doesn't have to be a really perfect answer.
 
                         Provide a brief explanation for your scoring.
                         Return ONLY a Python dictionary with this format:
