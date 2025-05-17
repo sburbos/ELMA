@@ -1080,7 +1080,7 @@ def turnitin_knockoff():
                 - "score": number between 0-100
                 - "flagged_passages": list of [phrase, score] pairs
                 - "explanation": string explanation
-
+                 - make sure that the analysis is based from the whole text and not focusing in a single sentence or phrases to prevent false positives or systematic errors in calculating.
                 Example response:
                 {{
                     "score": 75,
@@ -1149,7 +1149,7 @@ def turnitin_knockoff():
                 - "plagiarism_score": number between 0-100
                 - "potential_sources": list of {{"phrase": string, "source": string}}
                 - "suggestions": string
-
+                 - make sure that the analysis is based from the whole text and not focusing in a single sentence or phrases to prevent false positives or systematic errors in calculating.
                 Example response:
                 {{
                     "plagiarism_score": 60,
@@ -1221,6 +1221,7 @@ def turnitin_knockoff():
                 - "repetition_score": number between 0-100
                 - "most_repeated_phrases": list of {{"phrase": string, "count": number}}
                 - "suggestions": string
+                - make sure that the analysis is based from the whole text and not focusing in a single sentence or phrases to prevent false positives or systematic errors in calculating.
 
                 Example response:
                 {{
@@ -1282,7 +1283,7 @@ def turnitin_knockoff():
                 - "academic_tone_score": number between 0-100
                 - "vocabulary_diversity": number between 0-100
                 - "potential_issues": list of strings
-
+                 - make sure that the analysis is based from the whole text and not focusing in a single sentence or phrases to prevent false positives or systematic errors in calculating.
                 Example response:
                 {{
                     "academic_tone_score": 80,
