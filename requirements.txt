@@ -1,6 +1,7 @@
 streamlit
 beautifulsoup4
 python-docx
+openai
 python-pptx
 edge-tts
 PyPDF2
