@@ -35,21 +35,30 @@ def ai_assistant(prompt, rule):
     """OpenAI-compatible wrapper for Gemini 2.0 Flash"""
     try:
         client = OpenAI(
-            api_key="AIzaSyC5Vn0GQEbvGKRvPkwm42i0ZZYt0ChK-Xs",  # Replace with your actual key
-            base_url="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+            api_key="AIzaSyC5Vn0GQEbvGKRvPkwm42i0ZZYt0ChK-Xs",  # Your Gemini API key
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
         )
+
+        # Format messages correctly
+        messages = []
+        if rule:
+            messages.append({"role": "system", "content": rule})
+
+        if isinstance(prompt, str):
+            messages.append({"role": "user", "content": prompt})
+        elif isinstance(prompt, list):
+            messages.extend(prompt)
 
         response = client.chat.completions.create(
             model="gemini-2.0-flash",
-            messages=[
-                {"role": "system", "content": rule},
-                {"role": "user", "content": prompt}
-            ],
+            messages=messages,
             temperature=0.7,
             max_tokens=2048
         )
 
-        return response.choices[0].message.content
+        if response.choices and response.choices[0].message.content:
+            return response.choices[0].message.content
+        return None
 
     except Exception as e:
         st.error(f"API Error: {str(e)}")
@@ -986,7 +995,7 @@ def turnitin_knockoff():
     st.caption("Academic integrity analysis inspired by Turnitin")
 
     # Check if the AI assistant is working first
-    
+
     # Input options - text or file or URL
     input_method = st.radio("Input Method",
                             ["Text Input", "File Upload", "Website URL"],
