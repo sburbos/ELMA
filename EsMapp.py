@@ -1080,7 +1080,8 @@ def turnitin_knockoff():
                 - "score": number between 0-100
                 - "flagged_passages": list of [phrase, score] pairs
                 - "explanation": string explanation
-                 - make sure that the analysis is based from the whole text and not focusing in a single sentence or phrases to prevent false positives or systematic errors in calculating.
+                - make sure that the analysis is based from the whole text and not focusing in a single sentence or phrases to prevent false positives or systematic errors in calculating.
+
                 Example response:
                 {{
                     "score": 75,
@@ -1139,7 +1140,7 @@ def turnitin_knockoff():
             except Exception as e:
                 st.error(f"AI Detection analysis failed: {str(e)}")
 
-            # Plagiarism Analysis
+            # Plagiarism Analysis - Enhanced with clickable links
             st.subheader("🔗 External Similarity (Plagiarism Check)")
             try:
                 plag_prompt = f"""Analyze this text for potential plagiarism:
@@ -1147,15 +1148,27 @@ def turnitin_knockoff():
 
                 Return ONLY a JSON object with these keys:
                 - "plagiarism_score": number between 0-100
-                - "potential_sources": list of {{"phrase": string, "source": string}}
-                - "suggestions": string
-                 - make sure that the analysis is based from the whole text and not focusing in a single sentence or phrases to prevent false positives or systematic errors in calculating.
+                - "potential_sources": list of dictionaries with:
+                    - "phrase": the matching text segment
+                    - "source": website URL where similar content was found
+                    - "similarity_score": estimated similarity percentage (0-100)
+                - "suggestions": string with improvement recommendations
+                - make sure that the analysis is based from the whole text and not focusing in a single sentence or phrases to prevent false positives or systematic errors in calculating.
+
                 Example response:
                 {{
                     "plagiarism_score": 60,
                     "potential_sources": [
-                        {{"phrase": "sample text", "source": "example.com"}},
-                        {{"phrase": "another phrase", "source": "sample.org"}}
+                        {{
+                            "phrase": "sample text", 
+                            "source": "https://example.com/article1", 
+                            "similarity_score": 85
+                        }},
+                        {{
+                            "phrase": "another phrase", 
+                            "source": "https://sample.org/research", 
+                            "similarity_score": 72
+                        }}
                     ],
                     "suggestions": "Consider rephrasing these passages"
                 }}
@@ -1180,27 +1193,51 @@ def turnitin_knockoff():
                     st.progress(plag_data["plagiarism_score"] / 100)
                     st.metric("Plagiarism Risk Score", f"{plag_data['plagiarism_score']}%")
 
-                    # Annotated text display
+                    # Annotated text display with clickable links
                     if isinstance(plag_data["potential_sources"], list):
                         plag_annotated = text
+                        sources_by_phrase = {}
+
                         for item in plag_data["potential_sources"]:
                             if isinstance(item, dict) and "phrase" in item and "source" in item:
                                 phrase = item["phrase"]
                                 source = item["source"]
+                                similarity = item.get("similarity_score", 0)
+
+                                # Store sources for each phrase
+                                if phrase not in sources_by_phrase:
+                                    sources_by_phrase[phrase] = []
+                                sources_by_phrase[phrase].append((source, similarity))
+
+                                # Highlight in text
                                 if isinstance(phrase, str) and phrase in plag_annotated:
                                     plag_annotated = plag_annotated.replace(
                                         phrase,
-                                        f'<span style="background-color: #ffcccc" title="Possible source: {source}">{phrase}</span>'
+                                        f'<span style="background-color: #ffcccc" title="Potential source: {source} (Similarity: {similarity}%)">{phrase}</span>'
                                     )
 
                         with st.expander("Annotated Text (Plagiarism Check)"):
                             st.markdown(plag_annotated, unsafe_allow_html=True)
 
-                        with st.expander("Potential Sources"):
-                            for item in plag_data["potential_sources"][:10]:
-                                if isinstance(item, dict):
-                                    st.markdown(f"- `{item.get('phrase', '')}`")
-                                    st.caption(f"Possible source: {item.get('source', 'unknown')}")
+                        with st.expander("Potential Sources (Click to Visit)"):
+                            # Group sources by phrase
+                            for phrase, sources in sources_by_phrase.items():
+                                st.markdown(f"**Phrase:** `{phrase}`")
+
+                                # Sort sources by similarity score
+                                sources.sort(key=lambda x: x[1], reverse=True)
+
+                                for source, similarity in sources[:3]:  # Show top 3 sources per phrase
+                                    # Clean up URL for display
+                                    display_url = source.replace("https://", "").replace("http://", "").split("/")[0]
+
+                                    # Create clickable link
+                                    st.markdown(
+                                        f"- Similarity: {similarity}% | "
+                                        f"[{display_url}]({source})",
+                                        unsafe_allow_html=True
+                                    )
+                                st.markdown("---")
 
                     st.info("Suggestions: " + plag_data["suggestions"])
 
@@ -1283,7 +1320,8 @@ def turnitin_knockoff():
                 - "academic_tone_score": number between 0-100
                 - "vocabulary_diversity": number between 0-100
                 - "potential_issues": list of strings
-                 - make sure that the analysis is based from the whole text and not focusing in a single sentence or phrases to prevent false positives or systematic errors in calculating.
+                - make sure that the analysis is based from the whole text and not focusing in a single sentence or phrases to prevent false positives or systematic errors in calculating.
+
                 Example response:
                 {{
                     "academic_tone_score": 80,
@@ -1326,7 +1364,6 @@ def turnitin_knockoff():
 
             except Exception as e:
                 st.error(f"Style analysis failed: {str(e)}")
-
 # from bs4 import BeautifulSoup
 # from docx import Document
 # import python_pptx
