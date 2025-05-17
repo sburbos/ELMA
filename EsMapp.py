@@ -24,16 +24,23 @@ st.set_page_config(
 st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 try:
     # Access nested secrets
+    api_key = st.secrets.openrouter.OPENAI_API_KEY
+    base_url = st.secrets.openrouter.OPENAI_BASE_URL
 
-    os.environ["OPENAI_API_KEY"] = st.secrets.openrouter.OPENAI_API_KEY
-    os.environ["OPENAI_BASE_URL"] = st.secrets.openrouter.OPENAI_BASE_URL
+    client = OpenAI(
+        api_key=api_key,
+        base_url=base_url
+    )
 
-    client = OpenAI()
-
-
-
-    # Test connection
-    client.models.list()
+    # Test connection with a simple model list request
+    try:
+        models = client.models.list()
+        if not models.data:
+            st.error("API connection succeeded but no models available. Check your OpenRouter plan.")
+            st.stop()
+    except Exception as test_error:
+        st.error(f"API test failed: {str(test_error)}")
+        st.stop()
 
 except AttributeError as e:
     st.error(f"""
@@ -42,7 +49,7 @@ except AttributeError as e:
     Required structure:
     ```
     [openrouter]
-    OPENAI_API_KEY = "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"
+    OPENAI_API_KEY = "your-api-key-here"
     OPENAI_BASE_URL = "https://openrouter.ai/api/v1"
     ```
     """)
@@ -50,30 +57,50 @@ except AttributeError as e:
 except Exception as d:
     st.error(f"API connection failed: {str(d)}")
     st.stop()
-#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
+
+
 def ai_assistant(prompt, rule):
     try:
+        # First check if client is properly initialized
+        if not client:
+            st.error("AI client not initialized")
+            return None
+
         response = client.chat.completions.create(
             model="nousresearch/deephermes-3-mistral-24b-preview:free",
             extra_headers={
-                "HTTP-Referer": "https://lley-ai.streamlit.app/",  # Optional. Site URL for rankings on openrouter.ai.
-                "X-Title": "LleY Ai",  # Optional. Site title for rankings on openrouter.ai.
+                "HTTP-Referer": "https://lley-ai.streamlit.app/",
+                "X-Title": "LleY Ai",
             },
             messages=[
                 {
                     "role": "system",
-                    "content": rule
+                    "content": rule or "You are a helpful AI assistant"
                 },
                 {
                     "role": "user",
                     "content": prompt
                 }
             ],
-            max_tokens=90000  # Added to prevent timeouts
+            max_tokens=90000,
+            temperature=0.7
         )
+
+        if not response.choices:
+            st.error("Received empty response from AI")
+            return None
+
         return response.choices[0].message.content
+
     except Exception as det:
-        st.error(f"Failed to generate essay: {str(det)}")
+        st.error(f"Failed to generate response: {str(det)}")
+        # Add more specific error handling
+        if "rate limit" in str(det).lower():
+            st.warning("You've hit the rate limit. Please wait before making more requests.")
+        elif "authentication" in str(det).lower():
+            st.error("Authentication failed. Please check your API key.")
+        elif "connection" in str(det).lower():
+            st.error("Connection error. Please check your internet connection.")
         return None
 
 def main_page():
