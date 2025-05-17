@@ -735,6 +735,7 @@ def pdf2quiz():
                         - Completeness (how many key points are covered)
                         - Relevance (how well it addresses the question)
                         - Clarity (how well it's expressed)
+                        -As long as the answer has a point to think off then score something but not a perfect score
 
                         Provide a brief explanation for your scoring.
                         Return ONLY a Python dictionary with this format:
