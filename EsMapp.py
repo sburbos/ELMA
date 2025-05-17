@@ -12,6 +12,7 @@ import math
 from bs4 import BeautifulSoup
 import numpy as np
 from difflib import SequenceMatcher
+import os
 
 # Initialize the OpenAI client with proper configuration
 
@@ -23,13 +24,13 @@ st.set_page_config(
 st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 try:
     # Access nested secrets
-    api_key = st.secrets.openrouter.OPENAI_API_KEY
-    base_url = st.secrets.openrouter.OPENAI_BASE_URL
 
-    client = OpenAI(
-        api_key=api_key,
-        base_url=base_url
-    )
+    os.environ["OPENAI_API_KEY"] = st.secrets.openrouter.OPENAI_API_KEY
+    os.environ["OPENAI_BASE_URL"] = st.secrets.openrouter.OPENAI_BASE_URL
+
+    client = OpenAI()
+
+
 
     # Test connection
     client.models.list()
