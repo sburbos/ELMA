@@ -32,110 +32,29 @@ st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 
 
 def ai_assistant(prompt, rule):
-    """Enhanced Google Gemini API implementation with better error handling"""
+    """Minimal Google Gemini API implementation that just returns the response"""
     try:
-        # 1. Validate API key configuration
-        if not hasattr(st, 'secrets') or not hasattr(st.secrets, 'google') or not st.secrets.google.get("API_KEY"):
-            st.error("""
-            🔑 Missing or Invalid API Configuration:
-            Please ensure you have:
-            1. Created a .streamlit/secrets.toml file
-            2. Added your Google API key like this:
+        # Configure API
+        genai.configure(api_key=st.secrets.google.API_KEY)
 
-            [google]
-            API_KEY = "your_actual_api_key_here"
-            """)
-            return None
+        # Initialize model
+        model = genai.GenerativeModel('gemini-2.0-flash')
 
-        # 2. Configure API with timeout
-        genai.configure(
-            api_key=st.secrets.google.API_KEY,
-            transport='rest',
-            timeout=200
-        )
-
-        # 3. Initialize model with optimized settings
-        generation_config = {
-            "temperature": 0.7,
-            "top_p": 1.0,
-            "top_k": 0,
-            "max_output_tokens": 2048,
-        }
-
-        safety_settings = [
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
-            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_ONLY_HIGH"},
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
-        ]
-
-        model = genai.GenerativeModel(
-            'gemini-pro',  # Using the reliable 'gemini-pro' model
-            generation_config=generation_config,
-            safety_settings=safety_settings
-        )
-
-        # 4. Process input with better prompt engineering
+        # Process input
         if isinstance(prompt, list):  # Chat history
             chat = model.start_chat(history=[])
-
             if rule:
                 chat.send_message(rule)
-
             for msg in prompt:
                 if msg["role"] == "user":
-                    response = chat.send_message(msg["content"])
-                elif msg["role"] == "assistant":
-                    chat.history.append({
-                        "role": "model",
-                        "parts": [msg["content"]]
-                    })
-
-            if response and hasattr(response, 'text'):
-                return response.text
-            return None
-
+                    responses = chat.send_message(msg["content"])
+            return response.text if hasattr(responses, 'text') else None
         else:  # Single prompt
             full_prompt = f"{rule}\n\n{prompt}" if rule else prompt
-            response = model.generate_content(full_prompt)
+            responses = model.generate_content(full_prompt)
+            return response.text if hasattr(responses, 'text') else None
 
-            if response and hasattr(response, 'text'):
-                return response.text
-
-            st.warning("The AI didn't return any content. Try simplifying your request.")
-            return None
-
-    except Exception as e:
-        error_msg = str(e)
-
-        # Handle different error scenarios
-        if "SAFETY" in error_msg or "blocked" in error_msg.lower():
-            st.error("""
-            🚫 Content blocked by safety filters
-            Try rephrasing your request to be more neutral.
-            """)
-        elif "timeout" in error_msg.lower():
-            st.error("""
-            ⏱️ Request timed out
-            Please check your internet connection and try again.
-            """)
-        elif "quota" in error_msg.lower():
-            st.error("""
-            💸 API quota exceeded
-            Please check your Google AI Studio quota.
-            """)
-        else:
-            st.error(f"""
-            ⚠️ API Error: {error_msg}
-
-            🔧 Troubleshooting Steps:
-            1. Check your internet connection
-            2. Verify API key at https://aistudio.google.com/
-            3. Ensure you have API quota remaining
-            4. Try a simpler request
-            5. Contact support if issue persists
-            """)
-
+    except Exception:
         return None
 
 def main_page():
