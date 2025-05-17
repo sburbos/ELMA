@@ -1022,7 +1022,7 @@ def turnitin_knockoff():
                 }
             </style>
             """, unsafe_allow_html=True)
-
+    text = st.text_area("Your Text")
     try:
         ai_prompt = f"""Analyze the following text comprehensively to determine AI-generation likelihood:
                 {text[:analysis_depth]}
