@@ -17,7 +17,7 @@ st.set_page_config(
     page_icon=":writing_hand:",
     layout="wide"
 )
-
+st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 try:
     # Access nested secrets
     api_key = st.secrets.openrouter.OPENAI_API_KEY
@@ -71,7 +71,7 @@ def ai_assistant(prompt, rule):
     except Exception as det:
         st.error(f"Failed to generate essay: {str(det)}")
         return None
-st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
+
 def main_page():
     st.markdown("""
     <style>
@@ -672,7 +672,6 @@ def aito():
 
 
 def pdf2quiz():
-
     def extract_pdf_text(pdf_file: str) -> str:
         try:
             reader = PyPDF2.PdfReader(pdf_file)
@@ -702,7 +701,9 @@ def pdf2quiz():
         except Exception as d:
             st.error(f"Error reading PPTX: {str(d)}")
             return None
-    system_condition3 = """You are a system only for creating a quiz python dictionary. 
+
+    # System prompts for different quiz types
+    system_condition_mcq = """You are a system only for creating a multiple choice quiz python dictionary. 
                         Return ONLY a properly formatted Python dictionary with no additional text or explanation.
                         Format:
                         {
@@ -716,6 +717,28 @@ def pdf2quiz():
                             },
                             ...
                         }"""
+
+    system_condition_open = """You are a system only for creating an open-ended quiz python dictionary. 
+                        Return ONLY a properly formatted Python dictionary with no additional text or explanation.
+                        Format:
+                        {
+                            "1": {
+                                "question": "Question text",
+                                "type": "definition/enumeration/essay",
+                                "model_answer": "The ideal answer that would score 10/10"
+                            },
+                            ...
+                        }"""
+
+    scoring_system = """You are an expert grader. Evaluate the student's answer based on the model answer.
+                        Score each answer from 1-10 based on accuracy, completeness and relevance.
+                        Provide a brief explanation for your scoring.
+                        Return ONLY a Python dictionary with this format:
+                        {
+                            "score": x,
+                            "explanation": "Brief explanation of the score"
+                        }"""
+
     # Initialize session state
     if 'quiz' not in st.session_state:
         st.session_state.quiz = {
@@ -723,11 +746,20 @@ def pdf2quiz():
             'answers': {},
             'submitted': False,
             'file_processed': None,
-            'file_type': None
+            'file_type': None,
+            'quiz_type': 'multiple_choice'  # Default to multiple choice
         }
 
     st.title("File to Quiz Generator")
     st.subheader("Upload PDF or PPTX to generate a quiz")
+
+    # Quiz type selection
+    quiz_type = st.segmented_control(
+        "Quiz Type",
+        options=["Multiple Choice", "Open-Ended (Definition/Enumeration/Essay)"],
+        key="quiz_type_selector"
+    )
+    st.session_state.quiz['quiz_type'] = 'multiple_choice' if quiz_type == "Multiple Choice" else 'open_ended'
 
     # File uploader for both PDF and PPTX
     uploaded_file = st.file_uploader("Upload File", type=["pdf", "pptx"])
@@ -754,7 +786,7 @@ def pdf2quiz():
         )
 
         if st.button("Generate Quiz"):
-            with st.spinner(f"Generating quiz from {file_type}..."):
+            with st.spinner(f"Generating {quiz_type.lower()} quiz from {file_type}..."):
                 # Save uploaded file to temp file
                 with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
                     tmp_file.write(uploaded_file.getvalue())
@@ -768,16 +800,28 @@ def pdf2quiz():
 
                 if extracted_text and not extracted_text.startswith("No text"):
                     # Generate quiz from text
-                    full_prompt = f"""Create a multiple choice quiz based on the following text. 
-                    Generate {number_quiz} good quality questions that test understanding of key concepts.
-                    For each question, provide 4 plausible options (a-d) and indicate the correct answer.
-                    Return ONLY the Python dictionary in the specified format. 
-                    {extra_prompt if toggle_swap else ''}
+                    if st.session_state.quiz['quiz_type'] == 'multiple_choice':
+                        full_prompt = f"""Create a multiple choice quiz based on the following text. 
+                        Generate {number_quiz} good quality questions that test understanding of key concepts.
+                        For each question, provide 4 plausible options (a-d) and indicate the correct answer.
+                        Return ONLY the Python dictionary in the specified format. 
+                        {extra_prompt if toggle_swap else ''}
 
-                    Text content:
-                    {extracted_text[:10000]}"""  # Limit to first 10k chars
+                        Text content:
+                        {extracted_text[:10000]}"""  # Limit to first 10k chars
+                        system_prompt = system_condition_mcq
+                    else:
+                        full_prompt = f"""Create an open-ended quiz based on the following text. 
+                        Generate {number_quiz} questions that require definition, enumeration, or essay answers.
+                        For each question, provide a model answer that would score 10/10.
+                        Return ONLY the Python dictionary in the specified format.
+                        {extra_prompt if toggle_swap else ''}
 
-                    content_out = ai_assistant(full_prompt, system_condition3)
+                        Text content:
+                        {extracted_text[:10000]}"""
+                        system_prompt = system_condition_open
+
+                    content_out = ai_assistant(full_prompt, system_prompt)
 
                     if content_out:
                         try:
@@ -799,7 +843,9 @@ def pdf2quiz():
                                 'answers': {q_num: None for q_num in quiz_data},
                                 'submitted': False,
                                 'file_processed': uploaded_file,
-                                'file_type': file_type
+                                'file_type': file_type,
+                                'quiz_type': st.session_state.quiz['quiz_type'],
+                                'scores': {}
                             }
                             st.rerun()
 
@@ -812,8 +858,8 @@ def pdf2quiz():
 
     # Display the quiz if generated
     if st.session_state.quiz['data']:
-        st.subheader(f"Quiz Generated from {st.session_state.quiz.get('file_type', 'Unknown Type')}")
-
+        st.subheader(
+            f"{'Multiple Choice' if st.session_state.quiz['quiz_type'] == 'multiple_choice' else 'Open-Ended'} Quiz Generated from {st.session_state.quiz.get('file_type', 'Unknown Type')}")
         st.write(f"File: {st.session_state.quiz['file_processed'].name}")
 
         # Track if all questions have been answered
@@ -823,23 +869,39 @@ def pdf2quiz():
             st.markdown(f"**Question {q_num}**")
             st.write(question['question'])
 
-            options = [question['a'], question['b'], question['c'], question['d']]
+            if st.session_state.quiz['quiz_type'] == 'multiple_choice':
+                # Multiple choice interface
+                options = [question['a'], question['b'], question['c'], question['d']]
 
-            # Get current answer
-            current_answer = st.session_state.quiz['answers'].get(q_num)
+                # Get current answer
+                current_answer = st.session_state.quiz['answers'].get(q_num)
 
-            # Show radio buttons
-            user_choice = st.radio(
-                "Select your answer:",
-                options,
-                key=f"q_{q_num}",
-                index=options.index(current_answer) if current_answer in options else None
-            )
+                # Show radio buttons
+                user_choice = st.radio(
+                    "Select your answer:",
+                    options,
+                    key=f"q_{q_num}",
+                    index=options.index(current_answer) if current_answer in options else None
+                )
 
-            # Store answer if changed
-            if user_choice and user_choice != current_answer:
-                st.session_state.quiz['answers'][q_num] = user_choice
-                st.rerun()
+                # Store answer if changed
+                if user_choice and user_choice != current_answer:
+                    st.session_state.quiz['answers'][q_num] = user_choice
+                    st.rerun()
+            else:
+                # Open-ended interface
+                current_answer = st.session_state.quiz['answers'].get(q_num, "")
+                user_answer = st.text_area(
+                    "Your answer:",
+                    value=current_answer,
+                    key=f"q_{q_num}",
+                    height=150
+                )
+
+                # Store answer if changed
+                if user_answer != current_answer:
+                    st.session_state.quiz['answers'][q_num] = user_answer
+                    st.rerun()
 
             # Check if all questions answered
             if st.session_state.quiz['answers'].get(q_num) is None:
@@ -847,17 +909,46 @@ def pdf2quiz():
 
             # Show feedback after submission
             if st.session_state.quiz['submitted']:
-                correct_answer = question[question['answer_key']]
-                if st.session_state.quiz['answers'][q_num] == correct_answer:
-                    st.success("✓ Correct!")
+                if st.session_state.quiz['quiz_type'] == 'multiple_choice':
+                    correct_answer = question[question['answer_key']]
+                    if st.session_state.quiz['answers'][q_num] == correct_answer:
+                        st.success("✓ Correct!")
+                    else:
+                        st.error(f"✗ Incorrect. The correct answer is: {correct_answer}")
                 else:
-                    st.error(f"✗ Incorrect. The correct answer is: {correct_answer}")
+                    if q_num in st.session_state.quiz.get('scores', {}):
+                        score_data = st.session_state.quiz['scores'][q_num]
+                        st.markdown(f"**Score: {score_data['score']}/10**")
+                        st.markdown(f"**Explanation:** {score_data['explanation']}")
+                        st.markdown("**Model Answer:**")
+                        st.info(question['model_answer'])
 
         # Submit or Reset buttons
         col1, col2 = st.columns(2)
         with col1:
             if not st.session_state.quiz['submitted']:
                 if st.button("Submit Answers", disabled=not all_answered):
+                    if st.session_state.quiz['quiz_type'] == 'open_ended':
+                        # For open-ended questions, we need to score each answer
+                        with st.spinner("Evaluating your answers..."):
+                            scores = {}
+                            for q_num, question in st.session_state.quiz['data'].items():
+                                user_answer = st.session_state.quiz['answers'][q_num]
+                                prompt = f"""
+                                Model Answer: {question['model_answer']}
+                                Student Answer: {user_answer}
+
+                                Evaluate the student's answer based on the model answer.
+                                Score from 1-10 based on accuracy, completeness and relevance.
+                                Provide a brief explanation for your scoring.
+                                """
+                                score_data = ai_assistant(prompt, scoring_system)
+                                try:
+                                    scores[q_num] = ast.literal_eval(score_data.strip())
+                                except:
+                                    scores[q_num] = {"score": 0, "explanation": "Could not evaluate this answer"}
+                            st.session_state.quiz['scores'] = scores
+
                     st.session_state.quiz['submitted'] = True
                     st.rerun()
         with col2:
@@ -867,17 +958,26 @@ def pdf2quiz():
                     'answers': {},
                     'submitted': False,
                     'file_processed': None,
-                    'file_type': None
+                    'file_type': None,
+                    'quiz_type': 'multiple_choice',
+                    'scores': {}
                 }
                 st.rerun()
 
         # Calculate and display score if submitted
         if st.session_state.quiz['submitted']:
-            score = sum(
-                1 for q_num, question in st.session_state.quiz['data'].items()
-                if st.session_state.quiz['answers'][q_num] == question[question['answer_key']]
-            )
-            st.success(f"Your score: {score}/{len(st.session_state.quiz['data'])}")
+            if st.session_state.quiz['quiz_type'] == 'multiple_choice':
+                score = sum(
+                    1 for q_num, question in st.session_state.quiz['data'].items()
+                    if st.session_state.quiz['answers'][q_num] == question[question['answer_key']]
+                )
+                st.success(f"Your score: {score}/{len(st.session_state.quiz['data'])}")
+            else:
+                total_score = sum(
+                    score_data['score'] for score_data in st.session_state.quiz['scores'].values()
+                )
+                max_score = 10 * len(st.session_state.quiz['data'])
+                st.success(f"Your total score: {total_score}/{max_score} ({round(total_score / max_score * 100, 1)}%)")
 
 def about():
     st.title("About")
