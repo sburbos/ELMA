@@ -835,12 +835,16 @@ def pdf2quiz():
                             # Remove any remaining whitespace
                             clean_output = clean_output.strip()
 
-                            # Debug: Show cleaned output
-                            st.text("Cleaned output:")
-                            st.code(clean_output)
-
                             # Convert to dictionary
                             quiz_data = ast.literal_eval(clean_output)
+
+                            # For open-ended questions, ensure each question has required fields
+                            if st.session_state.quiz['quiz_type'] == 'open_ended':
+                                for q_num, question in quiz_data.items():
+                                    if 'model_answer' not in question:
+                                        question['model_answer'] = "No model answer provided"
+                                    if 'type' not in question:
+                                        question['type'] = "essay"
 
                             # Update session state
                             st.session_state.quiz = {
@@ -928,7 +932,7 @@ def pdf2quiz():
                         st.markdown(f"**Score: {score_data['score']}/10**")
                         st.markdown(f"**Explanation:** {score_data['explanation']}")
                         st.markdown("**Model Answer:**")
-                        st.info(question['model_answer'])
+                        st.info(question.get('model_answer', 'No model answer provided'))
 
         # Submit or Reset buttons
         col1, col2 = st.columns(2)
@@ -942,7 +946,7 @@ def pdf2quiz():
                             for q_num, question in st.session_state.quiz['data'].items():
                                 user_answer = st.session_state.quiz['answers'][q_num]
                                 prompt = f"""
-                                Model Answer: {question['model_answer']}
+                                Model Answer: {question.get('model_answer', 'No model answer provided')}
                                 Student Answer: {user_answer}
 
                                 Evaluate the student's answer based on the model answer.
