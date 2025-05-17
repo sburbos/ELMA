@@ -16,7 +16,7 @@ import numpy as np
 from difflib import SequenceMatcher
 import os
 import requests
-
+from google.api_core import retry
 # Initialize the OpenAI client with proper configuration
 
 st.set_page_config(
@@ -28,52 +28,90 @@ st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 
 #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
 #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
-import requests
+
 
 
 def ai_assistant(prompt, rule):
-    """Properly configured Gemini AI assistant function"""
+    """Enhanced Gemini AI assistant with robust error handling and configuration"""
     try:
-        # Validate API key
+        # 1. Validate and configure API
         if "google" not in st.secrets or "API_KEY" not in st.secrets.google:
-            st.error("🚫 Google API key not found in Streamlit secrets")
+            st.error("""
+            🚫 Configuration Missing:
+            Please add your Google API key to .streamlit/secrets.toml as:
+            [google]
+            API_KEY = "your_actual_api_key"
+            """)
             return None
 
-        api_key = st.secrets.google.API_KEY
+        genai.configure(api_key=st.secrets.google.API_KEY)
 
-        # Configure the Gemini client
-        genai.configure(api_key=api_key)
+        # 2. Model configuration with safety settings
+        generation_config = {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "top_k": 40,
+            "max_output_tokens": 2048,
+        }
 
-        # Initialize the model
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        safety_settings = [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_ONLY_HIGH"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
+        ]
 
-        # Format the prompt based on input type
-        if isinstance(prompt, list):
-            # Convert chat history to Gemini's format
-            messages = []
-            for msg in prompt:
-                if msg["role"] == "system":
-                    messages.append({"role": "model", "parts": [{"text": msg["content"]}]})
-                else:
-                    messages.append({"role": "user", "parts": [{"text": msg["content"]}]})
+        model = genai.GenerativeModel(
+            'gemini-1.5-flash',
+            generation_config=generation_config,
+            safety_settings=safety_settings
+        )
 
-            # Start a chat session if we have history
-            chat = model.start_chat(history=messages)
-            response = chat.send_message(rule if rule else "Respond to the user")
-        else:
-            # For single prompts, combine with rule if provided
-            full_prompt = f"{rule}\n\n{prompt}" if rule else prompt
-            response = model.generate_content(full_prompt)
+        # 3. Process input based on type
+        @retry.Retry()
+        def generate_response():
+            if isinstance(prompt, list):  # Chat history
+                history = []
+                for msg in prompt:
+                    role = "model" if msg["role"] == "system" else "user"
+                    history.append({"role": role, "parts": [{"text": msg["content"]}]})
 
-        # Return the text response
-        if response and response.text:
-            return response.text
-        else:
-            st.warning("🚫 No response from the model")
-            return None
+                chat = model.start_chat(history=history)
+                return chat.send_message(rule or "Respond to the user")
+            else:  # Single prompt
+                full_prompt = f"{rule}\n\n{prompt}" if rule else prompt
+                return model.generate_content(full_prompt)
 
+        # 4. Get and validate response
+        with st.spinner("Generating response..."):
+            response = generate_response()
+
+            if not response:
+                st.warning("⚠️ Received empty response from model")
+                return None
+
+            if hasattr(response, 'text'):  # Newer response format
+                return response.text
+            elif hasattr(response, 'candidates'):  # Legacy format
+                return response.candidates[0].content.parts[0].text
+            else:
+                st.error("⚠️ Unexpected response format from API")
+                return None
+
+    except genai.types.BlockedPromptError as e:
+        st.error(f"🚫 Content blocked by safety filters: {str(e)}")
+        return None
     except Exception as e:
-        st.error(f"🚫 An error occurred: {str(e)}")
+        st.error(f"""
+        🚫 API Error:
+        {str(e)}
+
+        Troubleshooting:
+        1. Verify API key is valid and has quota
+        2. Check your internet connection
+        3. Try a simpler prompt
+        4. Wait a minute and try again
+        """)
         return None
 
 
