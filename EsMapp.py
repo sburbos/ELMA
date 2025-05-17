@@ -54,7 +54,7 @@ except Exception as d:
 def ai_assistant(prompt, rule):
     try:
         response = client.chat.completions.create(
-            model="qwen/qwen3-235b-a22b:free",
+            model="nousresearch/deephermes-3-mistral-24b-preview:free",
             extra_headers={
                 "HTTP-Referer": "https://lley-ai.streamlit.app/",  # Optional. Site URL for rankings on openrouter.ai.
                 "X-Title": "LleY Ai",  # Optional. Site title for rankings on openrouter.ai.
