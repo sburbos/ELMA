@@ -60,7 +60,6 @@ def ai_assistant(prompt, rule):
                 st.warning(f"⚠️ API key ending in ...{key[-4:]} hit rate limit. Trying next key...")
                 continue  # Try the next key
             else:
-                st.error(f"❌ OpenRouter Error {response.status_code}: {response.text}")
                 continue
 
         except Exception as e:
