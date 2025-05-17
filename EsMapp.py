@@ -32,9 +32,9 @@ st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 
 
 def ai_assistant(prompt, rule):
-    """Enhanced Google Gemini API implementation with better error handling and security"""
+    """Enhanced Google Gemini API implementation with better error handling"""
     try:
-        # 1. Validate API key configuration more securely
+        # 1. Validate API key configuration
         if not hasattr(st, 'secrets') or not hasattr(st.secrets, 'google') or not st.secrets.google.get("API_KEY"):
             st.error("""
             🔑 Missing or Invalid API Configuration:
@@ -50,15 +50,15 @@ def ai_assistant(prompt, rule):
         # 2. Configure API with timeout
         genai.configure(
             api_key=st.secrets.google.API_KEY,
-            transport='rest',  # More reliable than default
-            timeout=30  # 30 second timeout
+            transport='rest',
+            timeout=30
         )
 
         # 3. Initialize model with optimized settings
         generation_config = {
             "temperature": 0.7,
-            "top_p": 1.0,  # More creative responses
-            "top_k": 0,  # Disable top_k sampling for more predictable results
+            "top_p": 1.0,
+            "top_k": 0,
             "max_output_tokens": 2048,
         }
 
@@ -70,7 +70,7 @@ def ai_assistant(prompt, rule):
         ]
 
         model = genai.GenerativeModel(
-            'gemini-1.5-flash',  # Using the latest model
+            'gemini-pro',  # Using the reliable 'gemini-pro' model
             generation_config=generation_config,
             safety_settings=safety_settings
         )
@@ -79,73 +79,65 @@ def ai_assistant(prompt, rule):
         if isinstance(prompt, list):  # Chat history
             chat = model.start_chat(history=[])
 
-            # Prepend system message if rule exists
             if rule:
-                chat.send_message(f"System instructions: {rule}")
+                chat.send_message(rule)
 
             for msg in prompt:
                 if msg["role"] == "user":
                     response = chat.send_message(msg["content"])
                 elif msg["role"] == "assistant":
-                    # Add assistant responses to history
                     chat.history.append({
                         "role": "model",
                         "parts": [msg["content"]]
                     })
 
-            return response.text if response else None
+            if response and hasattr(response, 'text'):
+                return response.text
+            return None
 
         else:  # Single prompt
-            full_prompt = f"""
-            {rule if rule else 'You are a helpful AI assistant. Provide detailed, accurate responses.'}
-
-            User request:
-            {prompt}
-
-            Please respond with clear, well-structured information.
-            """
-
+            full_prompt = f"{rule}\n\n{prompt}" if rule else prompt
             response = model.generate_content(full_prompt)
 
-            # Better response validation
-            if not response or not response.text:
-                st.warning("The AI didn't return any content. Try simplifying your request.")
-                return None
+            if response and hasattr(response, 'text'):
+                return response.text
 
-            return response.text
-
-    except genai.types.BlockedPromptError as e:
-        st.error(f"""
-        🚫 Content blocked by safety filters:
-        {str(e)}
-
-        Try rephrasing your request to be more neutral.
-        """)
-        return None
-
-    except genai.types.StopCandidateException as e:
-        st.error(f"""
-        ⚠️ Generation stopped unexpectedly:
-        {str(e)}
-
-        This usually means the response was incomplete.
-        Try breaking your request into smaller parts.
-        """)
-        return None
+            st.warning("The AI didn't return any content. Try simplifying your request.")
+            return None
 
     except Exception as e:
-        st.error(f"""
-        ⚠️ Critical API Error:
-        {str(e)}
+        error_msg = str(e)
 
-        🔧 Troubleshooting Steps:
-        1. Check your internet connection
-        2. Verify API key at https://aistudio.google.com/
-        3. Ensure you have API quota remaining
-        4. Try again in a few minutes
-        5. Contact support if issue persists
-        """)
+        # Handle different error scenarios
+        if "SAFETY" in error_msg or "blocked" in error_msg.lower():
+            st.error("""
+            🚫 Content blocked by safety filters
+            Try rephrasing your request to be more neutral.
+            """)
+        elif "timeout" in error_msg.lower():
+            st.error("""
+            ⏱️ Request timed out
+            Please check your internet connection and try again.
+            """)
+        elif "quota" in error_msg.lower():
+            st.error("""
+            💸 API quota exceeded
+            Please check your Google AI Studio quota.
+            """)
+        else:
+            st.error(f"""
+            ⚠️ API Error: {error_msg}
+
+            🔧 Troubleshooting Steps:
+            1. Check your internet connection
+            2. Verify API key at https://aistudio.google.com/
+            3. Ensure you have API quota remaining
+            4. Try a simpler request
+            5. Contact support if issue persists
+            """)
+
         return None
+    
 def main_page():
     st.markdown("""
     <style>
