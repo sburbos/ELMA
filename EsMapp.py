@@ -793,33 +793,73 @@ def pdf2quiz():
 
 # Update the display section to show the new evaluation format
 if st.session_state.quiz['submitted']:
-    if st.session_state.quiz['quiz_type'] == 'multiple_choice':
-    # [Multiple choice display remains the same]
-    else:
-        if q_num in st.session_state.quiz.get('scores', {}):
-            score_data = st.session_state.quiz['scores'][q_num]
-            st.markdown(f"**Score: {score_data.get('score', 0)}/10**")
-            st.markdown(f"**Explanation:** {score_data.get('explanation', 'No explanation provided')}")
-            st.markdown(f"**Feedback:** {score_data.get('feedback', 'No feedback provided')}")
+    if st.session_state.quiz['quiz_type'] == 'open_ended':
+        # For open-ended questions, we need to score each answer
+        with st.spinner("Evaluating your answers..."):
+            scores = {}
+            for q_num, question in st.session_state.quiz['data'].items():
+                user_answer = st.session_state.quiz['answers'][q_num]
+                criteria = "\n".join([f"- {c}" for c in question.get('scoring_criteria', [])])
 
-            if 'strengths' in score_data and score_data['strengths']:
-                st.markdown("**Strengths:**")
-                for strength in score_data['strengths']:
-                    st.markdown(f"- {strength}")
+                prompt = f"""
+                                    **Question:** {question['question']}
+                                    **Model Answer:** {question.get('model_answer', 'No model answer provided')}
+                                    **Scoring Criteria:**
+                                    {criteria}
+                                    **Student Answer:** {user_answer}
 
-            if 'weaknesses' in score_data and score_data['weaknesses']:
-                st.markdown("**Areas for Improvement:**")
-                for weakness in score_data['weaknesses']:
-                    st.markdown(f"- {weakness}")
+                                    Carefully evaluate the student's answer and provide:
+                                    1. A score between 1-9 (never 0 or 10)
+                                    2. Clear explanation
+                                    3. Specific feedback
+                                    4. Strengths and weaknesses
 
-            with st.expander("View Model Answer and Criteria"):
-                st.markdown("**Model Answer:**")
-                st.info(question.get('model_answer', 'No model answer provided'))
+                                    Return ONLY valid JSON with this exact structure:
+                                    {{
+                                        "score": 1-9,
+                                        "explanation": "...",
+                                        "feedback": "...",
+                                        "strengths": ["..."],
+                                        "weaknesses": ["..."]
+                                    }}
+                                    """
+                score_data = ai_assistant(prompt, scoring_system)
+                try:
+                    # First try to parse as JSON
+                    score_json = json.loads(score_data.strip())
 
-                if 'scoring_criteria' in question and question['scoring_criteria']:
-                    st.markdown("**Scoring Criteria:**")
-                    for criterion in question['scoring_criteria']:
-                        st.markdown(f"- {criterion}")
+                    # Validate the score is between 1-9
+                    if 'score' in score_json:
+                        score_json['score'] = max(1, min(9, int(score_json['score'])))
+
+                    scores[q_num] = score_json
+                except json.JSONDecodeError:
+                    # If JSON fails, try literal eval as fallback
+                    try:
+                        score_dict = ast.literal_eval(score_data.strip())
+                        if isinstance(score_dict, dict):
+                            if 'score' in score_dict:
+                                score_dict['score'] = max(1, min(9, int(score_dict['score'])))
+                            scores[q_num] = score_dict
+                        else:
+                            scores[q_num] = {
+                                "score": 5,  # Mid-range default
+                                "explanation": "Automatic scoring due to evaluation error",
+                                "feedback": "The system couldn't properly evaluate this answer",
+                                "strengths": [],
+                                "weaknesses": ["Answer format may need improvement"]
+                            }
+                    except:
+                        # Final fallback if all parsing fails
+                        scores[q_num] = {
+                            "score": 5,
+                            "explanation": "Evaluation system error",
+                            "feedback": "Please check your answer format and try again",
+                            "strengths": [],
+                            "weaknesses": []
+                        }
+
+            st.session_state.quiz['scores'] = scores
 
 
 def extract_text_from_file(uploaded_file):
