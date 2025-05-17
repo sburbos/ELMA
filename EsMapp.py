@@ -47,7 +47,7 @@ def ai_assistant(prompt, rule):
             ]
 
             data = {
-                "model": "mistralai/mistral-7b-instruct:free",
+                "model": "nousresearch/deephermes-3-mistral-24b-preview:free",
                 "messages": messages,
                 "max_tokens": 2048
             }
