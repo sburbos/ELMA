@@ -17,6 +17,32 @@ st.set_page_config(
     page_icon=":writing_hand:",
     layout="wide"
 )
+
+
+def ai_assistant(prompt, rule):
+    try:
+        response = client.chat.completions.create(
+            model="nousresearch/deephermes-3-mistral-24b-preview:free",
+            extra_headers={
+                "HTTP-Referer": "https://esmapp.streamlit.app/",  # Optional. Site URL for rankings on openrouter.ai.
+                "X-Title": "LleY Ai",  # Optional. Site title for rankings on openrouter.ai.
+            },
+            messages=[
+                {
+                    "role": "system",
+                    "content": rule
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            max_tokens=20000  # Added to prevent timeouts
+        )
+        return response.choices[0].message.content
+    except Exception as det:
+        st.error(f"Failed to generate essay: {str(det)}")
+        return None
 st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 def main_page():
     st.markdown("""
@@ -236,28 +262,10 @@ def esma():
         "The Nostalgist",
         "The Minimalist",
     ]
+    condition_system = """You are EsMa. Strictly only write the requested essay content or content creation scripts. 
+                        Do not write any other information. Meaning, only write paragraphs (unless user chose content creation). 
+                        Also the output must have be clear and specific with no vague output"""
 
-    def ai_assistant(prompt):
-        try:
-            response = client.chat.completions.create(
-                model="nousresearch/deephermes-3-mistral-24b-preview:free",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """You are EsMa. Strictly only write the requested essay content or content creation scripts. 
-                        Do not write any other information. Meaning, only write paragraphs (unless user chose content creation). Also the output must have be clear and specific with no vague output"""
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                max_tokens=20000  # Added to prevent timeouts
-            )
-            return response.choices[0].message.content
-        except Exception as det:
-            st.error(f"Failed to generate essay: {str(det)}")
-            return None
 
     # Main app interface
     def main():
@@ -287,7 +295,7 @@ def esma():
                     else:
                         with st.spinner("Generating your essay..."):
                             full_prompt = f"Write a comprehensive {essay_type}, point of view: {selected_pov} point of view, education level: {level_essay}, language to use:{speech},  type of speech: {speech_type}, number of minimum words: {word_num}, essay about: {content_prompt}. With extra task {other_info_prompt}"
-                            essay = ai_assistant(full_prompt)
+                            essay = ai_assistant(full_prompt, condition_system)
                             if essay:
                                 right.text_area("Generated Essay", value=essay, height=680)
 
@@ -317,7 +325,7 @@ def esma():
                             and will portray a character: {selected_character}. With extra task {other_info_prompt}
 
 """
-                            content_out = ai_assistant(full_prompt)
+                            content_out = ai_assistant(full_prompt, condition_system)
                             if content_out:
                                 right.text_area("Generated Content", value=content_out, height=680)
 
@@ -661,17 +669,7 @@ def aito():
         st.error(f"API connection failed: {str(d)}")
         st.stop()
 
-    def ai_assistant(messages):
-        try:
-            response = client.chat.completions.create(
-                model="nousresearch/deephermes-3-mistral-24b-preview:free",
-                messages=messages,
-                max_tokens=20000
-            )
-            return response.choices[0].message.content
-        except Exception as det:
-            st.error(f"Failed to generate response: {str(det)}")
-            return None
+
 
     st.title("AITO")
     st.caption("AI TOol for General Purpose")
@@ -694,7 +692,7 @@ def aito():
         st.chat_message("user").write(prompt)
 
         # Get AI response with full conversation history
-        response = ai_assistant(st.session_state.messages)
+        response = ai_assistant(st.session_state.messages, rule=None)
 
         if response:
             # Add AI response to chat history
@@ -761,15 +759,7 @@ def pdf2quiz():
         except Exception as d:
             st.error(f"Error reading PPTX: {str(d)}")
             return None
-
-    def ai_assistant(prompt):
-        try:
-            response = client.chat.completions.create(
-                model="nousresearch/deephermes-3-mistral-24b-preview:free",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """You are a system only for creating a quiz python dictionary. 
+    system_condition3 = """You are a system only for creating a quiz python dictionary. 
                         Return ONLY a properly formatted Python dictionary with no additional text or explanation.
                         Format:
                         {
@@ -783,20 +773,6 @@ def pdf2quiz():
                             },
                             ...
                         }"""
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                max_tokens=20000,
-                temperature=0.3
-            )
-            return response.choices[0].message.content
-        except Exception as det:
-            st.error(f"Failed to generate quiz: {str(det)}")
-            return None
-
     # Initialize session state
     if 'quiz' not in st.session_state:
         st.session_state.quiz = {
@@ -858,7 +834,7 @@ def pdf2quiz():
                     Text content:
                     {extracted_text[:10000]}"""  # Limit to first 10k chars
 
-                    content_out = ai_assistant(full_prompt)
+                    content_out = ai_assistant(full_prompt, system_condition3)
 
                     if content_out:
                         try:
