@@ -75,7 +75,7 @@ def ai_assistant(prompt, rule):
             messages=[
                 {
                     "role": "system",
-                    "content": rule or "You are a helpful AI assistant"
+                    "content": rule 
                 },
                 {
                     "role": "user",
