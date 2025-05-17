@@ -45,7 +45,7 @@ def ai_assistant(prompt, rule):
         genai.configure(api_key=api_key)
 
         # Initialize the model
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-2.0-flash')
 
         # Format the prompt based on input type
         if isinstance(prompt, list):
