@@ -1001,264 +1001,224 @@ def extract_text_from_file(uploaded_file):
 def turnitin_knockoff():
     # ... [previous code remains the same until the AI Detection section]
 
-    # Enhanced AI Detection Analysis with Comprehensive Metrics
-    st.subheader("🔍 AI Similarity Check")
-    st.markdown("""
-            <style>
-                .metric-box {
-                    border: 1px solid #ccc;
-                    border-radius: 5px;
-                    padding: 15px;
-                    margin-bottom: 15px;
-                    background-color: #f9f9f9;
-                }
-                .metric-title {
-                    font-weight: bold;
-                    margin-bottom: 5px;
-                }
-                .source-link {
-                    color: #0066cc;
-                    text-decoration: underline;
-                }
-            </style>
-            """, unsafe_allow_html=True)
-    text = st.text_area("Your Text")
+    # Enhanced AI Detection Analysis
+    st.subheader("🤖 Advanced AI Detection Analysis")
     try:
-        ai_prompt = f"""Analyze the following text comprehensively to determine AI-generation likelihood:
+        ai_prompt = f"""Analyze the following text for AI-generated patterns using measurable linguistic features:
                 {text[:analysis_depth]}
 
-                Calculate an overall AI similarity percentage (0-100%) based on these measurable linguistic features:
-                1. Perplexity (predictability of word choices)
-                2. Burstiness (variation in sentence structure)
-                3. Syntactic Uniformity (grammatical pattern consistency)
-                4. Repetition (frequency of repeated phrases)
+                Perform a thorough analysis considering these specific metrics:
+                1. Perplexity (measure of how unpredictable/surprising the text is)
+                2. Burstiness (variation in sentence structure and length)
+                3. Syntactic Uniformity (consistency in grammatical patterns)
+                4. Repetition (frequency of repeated phrases/ideas)
+                5. Semantic Coherence (logical flow between ideas)
 
-                For each feature:
-                - Score between 0-100 (higher = more AI-like)
-                - Explanation with specific examples from text
-                - Typical human vs AI ranges
-                - Weight in final calculation (perplexity: 30%, burstiness: 25%, 
-                  syntactic uniformity: 25%, repetition: 20%)
+                Return ONLY a JSON object with these keys:
+                - "overall_ai_score": number between 0-100 (percentage likelihood of AI generation)
+                - "confidence": number between 0-100 (confidence in the analysis)
+                - "limitations": string (acknowledgment of analysis limitations)
+                - "metrics": {{
+                    "perplexity": {{
+                        "score": 0-100,
+                        "explanation": "string",
+                        "human_typical_range": "string",
+                        "ai_typical_range": "string"
+                    }},
+                    "burstiness": {{
+                        "score": 0-100,
+                        "explanation": "string",
+                        "human_typical_range": "string",
+                        "ai_typical_range": "string"
+                    }},
+                    "syntactic_uniformity": {{
+                        "score": 0-100,
+                        "explanation": "string",
+                        "human_typical_range": "string",
+                        "ai_typical_range": "string"
+                    }},
+                    "repetition": {{
+                        "score": 0-100,
+                        "explanation": "string",
+                        "human_typical_range": "string",
+                        "ai_typical_range": "string"
+                    }}
+                }},
+                - "flagged_passages": list of dictionaries with:
+                    - "phrase": string (the suspicious text segment)
+                    - "score": 0-100 (AI likelihood for this segment)
+                    - "reason": string (specific reason for flagging)
+                    - "similar_sources": list of dictionaries with:
+                        - "url": string (source URL if available)
+                        - "similarity": 0-100 (similarity percentage)
+                        - "source_type": "AI-generated" or "human-written"
+                - "research_references": list of relevant research papers/studies supporting this analysis
 
-                Also identify:
-                - Specific passages most likely AI-generated
-                - Similar online sources with clickable URLs
-                - Supporting research references
-
-                Return ONLY this JSON structure:
+                Example response:
                 {{
-                    "overall_ai_score": 0-100,
-                    "confidence": 0-100,
-                    "limitations": "string",
+                    "overall_ai_score": 75,
+                    "confidence": 85,
+                    "limitations": "Analysis limited to English text and may not detect highly sophisticated AI generation",
                     "metrics": {{
                         "perplexity": {{
-                            "score": 0-100,
-                            "explanation": "string",
-                            "human_range": "string",
-                            "ai_range": "string",
-                            "examples": ["string"],
-                            "weight": 0.3
+                            "score": 68,
+                            "explanation": "Lower than typical human writing, suggesting predictable word choices",
+                            "human_typical_range": "50-90",
+                            "ai_typical_range": "30-70"
                         }},
                         "burstiness": {{
-                            "score": 0-100,
-                            "explanation": "string",
-                            "human_range": "string",
-                            "ai_range": "string",
-                            "examples": ["string"],
-                            "weight": 0.25
+                            "score": 42,
+                            "explanation": "Sentence structure shows less variation than human writing",
+                            "human_typical_range": "60-95",
+                            "ai_typical_range": "30-65"
                         }},
                         "syntactic_uniformity": {{
-                            "score": 0-100,
-                            "explanation": "string",
-                            "human_range": "string",
-                            "ai_range": "string",
-                            "examples": ["string"],
-                            "weight": 0.25
+                            "score": 78,
+                            "explanation": "Highly consistent grammatical patterns",
+                            "human_typical_range": "40-80",
+                            "ai_typical_range": "65-95"
                         }},
                         "repetition": {{
-                            "score": 0-100,
-                            "explanation": "string",
-                            "human_range": "string",
-                            "ai_range": "string",
-                            "examples": ["string"],
-                            "weight": 0.2
+                            "score": 55,
+                            "explanation": "Moderate repetition of key phrases",
+                            "human_typical_range": "20-60",
+                            "ai_typical_range": "40-80"
                         }}
                     }},
                     "flagged_passages": [
                         {{
-                            "text": "string",
-                            "score": 0-100,
-                            "reason": "string",
-                            "sources": [
+                            "phrase": "In today's rapidly evolving technological landscape",
+                            "score": 82,
+                            "reason": "Common AI-generated opening phrase",
+                            "similar_sources": [
                                 {{
-                                    "url": "string",
-                                    "similarity": 0-100,
-                                    "type": "AI|human"
+                                    "url": "https://example-ai-content.com/article1",
+                                    "similarity": 88,
+                                    "source_type": "AI-generated"
                                 }}
                             ]
                         }}
                     ],
                     "research_references": [
-                        {{
-                            "title": "string",
-                            "url": "string",
-                            "author": "string",
-                            "year": number
-                        }}
-                    ],
-                    "calculation_note": "string"
-                }}"""
+                        "Detecting GPT-Generated Text with Perplexity (Gehrmann et al., 2019)",
+                        "Burstiness as a Measure of Human vs AI Writing (Ippolito et al., 2020)"
+                    ]
+                }}
+                """
 
-        ai_result = ai_assistant(ai_prompt, """You are an advanced AI detection system. Your analysis must:
-                1. Use only measurable linguistic features
-                2. Show exact calculation method
-                3. Provide specific text examples
-                4. Include verifiable sources
-                5. Make all URLs complete and clickable
-                Return ONLY valid JSON.""")
+        ai_result = ai_assistant(ai_prompt, """You are an advanced AI content detector. 
+                Your analysis must be based on measurable linguistic features and supported by research. 
+                Return ONLY valid JSON with detailed metrics and explanations.""")
 
         if not ai_result:
             raise ValueError("No response received from AI assistant")
 
         try:
             ai_data = ast.literal_eval(ai_result)
+            if not isinstance(ai_data, dict):
+                raise ValueError("Response is not a dictionary")
 
-            # Validation
-            required = ["overall_ai_score", "confidence", "metrics", "flagged_passages"]
-            if not all(field in ai_data for field in required):
-                raise ValueError("Missing required fields in response")
+            # Validate required fields
+            required_fields = ["overall_ai_score", "confidence", "limitations", "metrics", "flagged_passages"]
+            for field in required_fields:
+                if field not in ai_data:
+                    raise ValueError(f"Missing required field: {field}")
 
-            # Display Main Results
-            st.markdown(f"""
-                    <div class="metric-box">
-                        <div class="metric-title">Overall AI Similarity Score</div>
-                        <h2>{ai_data['overall_ai_score']}%</h2>
-                        <div>Confidence: {ai_data['confidence']}%</div>
-                        <div><small>{ai_data.get('calculation_note', '')}</small></div>
-                    </div>
-                    """, unsafe_allow_html=True)
+            # Display overall results
+            st.progress(ai_data["overall_ai_score"] / 100)
 
-            # Detailed Metrics Section
-            with st.expander("Detailed Analysis Metrics", expanded=True):
-                cols = st.columns(4)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("AI Likelihood Score", f"{ai_data['overall_ai_score']}%")
+            with col2:
+                st.metric("Analysis Confidence", f"{ai_data['confidence']}%")
+
+            st.caption(f"*Limitations: {ai_data.get('limitations', 'None specified')}*")
+
+            # Display detailed metrics
+            with st.expander("Detailed Linguistic Analysis"):
                 metrics = ai_data["metrics"]
 
-                with cols[0]:
-                    st.markdown(f"""
-                            <div class="metric-box">
-                                <div class="metric-title">Perplexity</div>
-                                <h3>{metrics['perplexity']['score']}%</h3>
-                                <div><small>Human: {metrics['perplexity']['human_range']}</small></div>
-                                <div><small>AI: {metrics['perplexity']['ai_range']}</small></div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                    with st.popover("ℹ️ Details"):
-                        st.write(metrics['perplexity']['explanation'])
-                        st.write("Examples:")
-                        for ex in metrics['perplexity']['examples'][:2]:
-                            st.code(ex)
+                # Perplexity
+                st.markdown("### Perplexity Analysis")
+                st.progress(metrics["perplexity"]["score"] / 100)
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Score", f"{metrics['perplexity']['score']}%")
+                with col2:
+                    st.metric("Human Range", metrics["perplexity"]["human_typical_range"])
+                st.write(metrics["perplexity"]["explanation"])
+                st.caption(f"AI Typical Range: {metrics['perplexity']['ai_typical_range']}")
 
-                with cols[1]:
-                    st.markdown(f"""
-                            <div class="metric-box">
-                                <div class="metric-title">Burstiness</div>
-                                <h3>{metrics['burstiness']['score']}%</h3>
-                                <div><small>Human: {metrics['burstiness']['human_range']}</small></div>
-                                <div><small>AI: {metrics['burstiness']['ai_range']}</small></div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                    with st.popover("ℹ️ Details"):
-                        st.write(metrics['burstiness']['explanation'])
-                        st.write("Examples:")
-                        for ex in metrics['burstiness']['examples'][:2]:
-                            st.code(ex)
+                # Burstiness
+                st.markdown("### Burstiness Analysis")
+                st.progress(metrics["burstiness"]["score"] / 100)
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Score", f"{metrics['burstiness']['score']}%")
+                with col2:
+                    st.metric("Human Range", metrics["burstiness"]["human_typical_range"])
+                st.write(metrics["burstiness"]["explanation"])
+                st.caption(f"AI Typical Range: {metrics['burstiness']['ai_typical_range']}")
 
-                with cols[2]:
-                    st.markdown(f"""
-                            <div class="metric-box">
-                                <div class="metric-title">Syntactic Uniformity</div>
-                                <h3>{metrics['syntactic_uniformity']['score']}%</h3>
-                                <div><small>Human: {metrics['syntactic_uniformity']['human_range']}</small></div>
-                                <div><small>AI: {metrics['syntactic_uniformity']['ai_range']}</small></div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                    with st.popover("ℹ️ Details"):
-                        st.write(metrics['syntactic_uniformity']['explanation'])
-                        st.write("Examples:")
-                        for ex in metrics['syntactic_uniformity']['examples'][:2]:
-                            st.code(ex)
+                # Syntactic Uniformity
+                st.markdown("### Syntactic Uniformity Analysis")
+                st.progress(metrics["syntactic_uniformity"]["score"] / 100)
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Score", f"{metrics['syntactic_uniformity']['score']}%")
+                with col2:
+                    st.metric("Human Range", metrics["syntactic_uniformity"]["human_typical_range"])
+                st.write(metrics["syntactic_uniformity"]["explanation"])
+                st.caption(f"AI Typical Range: {metrics['syntactic_uniformity']['ai_typical_range']}")
 
-                with cols[3]:
-                    st.markdown(f"""
-                            <div class="metric-box">
-                                <div class="metric-title">Repetition</div>
-                                <h3>{metrics['repetition']['score']}%</h3>
-                                <div><small>Human: {metrics['repetition']['human_range']}</small></div>
-                                <div><small>AI: {metrics['repetition']['ai_range']}</small></div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                    with st.popover("ℹ️ Details"):
-                        st.write(metrics['repetition']['explanation'])
-                        st.write("Examples:")
-                        for ex in metrics['repetition']['examples'][:2]:
-                            st.code(ex)
+                # Repetition
+                st.markdown("### Repetition Analysis")
+                st.progress(metrics["repetition"]["score"] / 100)
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Score", f"{metrics['repetition']['score']}%")
+                with col2:
+                    st.metric("Human Range", metrics["repetition"]["human_typical_range"])
+                st.write(metrics["repetition"]["explanation"])
+                st.caption(f"AI Typical Range: {metrics['repetition']['ai_typical_range']}")
 
-            # Flagged Passages with Clickable Links
+            # Display flagged passages with sources
             with st.expander("Flagged Passages & Similar Sources"):
                 for passage in ai_data["flagged_passages"]:
-                    st.markdown(f"""
-                            <div style="border-left: 3px solid #ff6b6b; padding-left: 10px; margin: 10px 0;">
-                                <div style="font-weight: bold;">AI Likelihood: {passage['score']}%</div>
-                                <code>{passage['text']}</code>
-                                <div><small>Reason: {passage['reason']}</small></div>
-                            </div>
-                            """, unsafe_allow_html=True)
+                    st.markdown(f"**Passage:** `{passage['phrase']}`")
+                    st.markdown(f"**AI Likelihood:** {passage['score']}%")
+                    st.markdown(f"**Reason:** {passage['reason']}")
 
-                    if passage.get("sources"):
+                    if passage.get("similar_sources"):
                         st.markdown("**Similar Sources:**")
-                        for source in passage["sources"]:
+                        for source in passage["similar_sources"]:
                             if source.get("url"):
                                 st.markdown(
-                                    f"- <a href='{source['url']}' class='source-link' target='_blank'>{source['url']}</a> "
+                                    f"- [{source['url']}]({source['url']}) "
                                     f"(Similarity: {source['similarity']}%, "
-                                    f"Type: {source['type']})",
-                                    unsafe_allow_html=True
+                                    f"Type: {source['source_type']})"
                                 )
                             else:
                                 st.markdown(
                                     f"- Similar content found (Similarity: {source['similarity']}%, "
-                                    f"Type: {source['type']})"
+                                    f"Type: {source['source_type']})"
                                 )
                     st.markdown("---")
 
-            # Research References with Clickable Links
+            # Display research references if available
             if ai_data.get("research_references"):
                 with st.expander("Supporting Research"):
                     for ref in ai_data["research_references"]:
-                        if ref.get("url"):
-                            st.markdown(
-                                f"- <a href='{ref['url']}' class='source-link' target='_blank'>{ref['title']}</a> "
-                                f"({ref['author']}, {ref['year']})",
-                                unsafe_allow_html=True
-                            )
-                        else:
-                            st.markdown(f"- {ref['title']} ({ref['author']}, {ref['year']})")
-
-            # Limitations
-            st.markdown(f"""
-                    <div style="background-color: #fff3cd; padding: 10px; border-radius: 5px; margin-top: 20px;">
-                        <strong>⚠️ Analysis Limitations:</strong> {ai_data.get('limitations', 'None specified')}
-                    </div>
-                    """, unsafe_allow_html=True)
+                        st.markdown(f"- {ref}")
 
         except Exception as e:
-            st.error(f"Error processing analysis: {str(e)}")
+            st.error(f"Error processing AI analysis: {str(e)}")
             st.text_area("Raw AI Response", value=ai_result, height=200)
 
     except Exception as e:
-        st.error(f"AI detection failed: {str(e)}")
+        st.error(f"AI Detection analysis failed: {str(e)}")
 
-    # ... [rest of the function remains the same]
     # ... [rest of the function remains the same]
 # from bs4 import BeautifulSoup
 # from docx import Document
