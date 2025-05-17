@@ -35,59 +35,95 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 def ai_assistant(prompt, rule):
     try:
-        # --- SECRETS DEBUGGING ---
-        logging.info("Checking for st.secrets.google.API_KEY...")
+        # --- Secrets Debugging (CRITICAL) ---
+        logging.info("--- Starting ai_assistant ---")
+        logging.info("Checking for st.secrets...")
+        if not st.secrets:
+            logging.error("Error: st.secrets is empty or not initialized.")
+            st.error("🚫 Streamlit secrets are not available. Ensure .streamlit/secrets.toml is correctly configured and Streamlit is restarted.")
+            return None
+
         if "google" not in st.secrets:
             logging.error("Error: 'google' section not found in st.secrets.")
-            st.error("🚫 Streamlit secrets are not configured correctly. Check your .streamlit/secrets.toml file.")
+            st.error("🚫 'google' section missing in secrets.toml. Should be like: [google]\\nAPI_KEY = 'YOUR_KEY'")
             return None
+
         if "API_KEY" not in st.secrets.google:
             logging.error("Error: 'API_KEY' not found in st.secrets.google.")
-            st.error("🚫 API key not found in Streamlit secrets.  Ensure API_KEY is defined under [google].")
+            st.error("🚫 API_KEY missing under [google] in secrets.toml.")
             return None
 
         api_key = st.secrets.google.API_KEY
-        logging.info("API key found in st.secrets.")
+        logging.info("API key found: (first 4 chars) " + api_key[:4])  # Log a snippet
 
-        genai.configure(api_key=api_key)
-        logging.info("Google Generative AI API configured successfully.")
+        # --- API Configuration ---
+        logging.info("Configuring genai with API key...")
+        try:
+            genai.configure(api_key=api_key)
+            logging.info("genai.configure successful.")
+        except Exception as config_error:
+            logging.error(f"genai.configure failed: {config_error}", exc_info=True)
+            st.error(f"🚫 Error configuring the Generative AI API: {config_error}")
+            return None
 
-        model_name = "models/gemini-2.0-flash"  # VERIFY THIS MODEL NAME!
-        logging.info(f"Attempting to use model: {model_name}")
-        model = genai.GenerativeModel(model_name)
+        model_name = 'models/gemini-2.0-flash'  # VERY IMPORTANT: Double-check this!
+        logging.info(f"Using model: {model_name}")
+        try:
+            model = genai.GenerativeModel(model_name)
+        except Exception as model_error:
+            logging.error(f"Error initializing model {model_name}: {model_error}", exc_info=True)
+            st.error(f"🚫 Error initializing model: {model_error}")
+            return None
 
+        # --- Prompt Formatting ---
         messages = prompt if isinstance(prompt, list) else [
             {"role": "system", "content": rule},
             {"role": "user", "content": prompt}
         ]
 
-        if isinstance(prompt, list):
-            full_prompt = " ".join(f"{msg['role']}: {msg['content']}" for msg in messages)  # More robust join
-            logging.info(f"Full prompt (list): {full_prompt}")
-        else:
-            full_prompt = rule + " " + prompt
-            logging.info(f"Full prompt (single): {full_prompt}")
-
-        logging.info("Sending request to the model...")
-        response = model.generate_content(full_prompt)
-
-        logging.info("API call completed.")
-
-        if response and response.text:  # Check for a valid response object
-            logging.info("Response text found. Returning.")
-            return response.text
-        else:
-            logging.warning("🚫  No response or empty response from the model.")
-            st.warning("🚫  No response from the model.")
-            if response:
-                logging.warning(f"Full response: {response}")  # Log the entire response for inspection
+        try:
+            if isinstance(prompt, list):
+                full_prompt = " ".join(f"{msg['role']}: {msg['content']}" for msg in messages)
+                logging.info(f"Full prompt (list): {full_prompt}")
             else:
-                logging.warning("Response object is None.")
+                full_prompt = rule + " " + prompt
+                logging.info(f"Full prompt (single): {full_prompt}")
+        except Exception as prompt_format_error:
+            logging.error(f"Error formatting prompt: {prompt_format_error}", exc_info=True)
+            st.error(f"🚫 Prompt formatting error: {prompt_format_error}")
             return None
 
-    except Exception as e:
-        logging.error(f"🚫 An error occurred: {e}", exc_info=True)
-        st.error(f"🚫 An error occurred: {e}")
+        # --- API Call ---
+        logging.info("Sending request to the model...")
+        try:
+            response = model.generate_content(full_prompt)
+            logging.info("API call successful (no immediate error).")
+        except Exception as api_call_error:
+            logging.error(f"API call failed: {api_call_error}", exc_info=True)
+            st.error(f"🚫 API call error: {api_call_error}")
+            return None
+
+        # --- Response Handling ---
+        try:
+            if response and response.text:
+                logging.info("Response text found. Returning.")
+                return response.text
+            else:
+                logging.warning("🚫 No response or empty response.")
+                st.warning("🚫 No response from the model.")
+                if response:
+                    logging.warning(f"Full response: {response}")
+                else:
+                    logging.warning("Response object is None.")
+                return None
+        except Exception as response_error:
+            logging.error(f"Error processing response: {response_error}", exc_info=True)
+            st.error(f"🚫 Error processing response: {response_error}")
+            return None
+
+    except Exception as overall_error:
+        logging.error(f"🚫 An unexpected error occurred: {overall_error}", exc_info=True)
+        st.error(f"🚫 An unexpected error occurred: {overall_error}")
         return None
 def main_page():
     st.markdown("""
