@@ -1,3 +1,4 @@
+#google api key AIzaSyAI_nzXk4dW-VUxG7T23uB_Tm9WXT3ZQ1M
 import streamlit as st
 import tempfile
 from attr import NothingType
@@ -998,372 +999,227 @@ def extract_text_from_file(uploaded_file):
 
 
 def turnitin_knockoff():
-    st.title("🔍 Originality Checker")
-    st.caption("Academic integrity analysis inspired by Turnitin")
+    # ... [previous code remains the same until the AI Detection section]
 
-    # Check if the AI assistant is working first
-    def test_ai_assistant():
-        try:
-            test_response = ai_assistant("Test - respond with 'OK'", "You are a test assistant")
-            return test_response == "OK"
-        except Exception as e:
-            st.error(f"AI connection test failed: {str(e)}")
-            return False
-
-    if not test_ai_assistant():
-        st.error("⚠️ The AI assistant is not responding properly. Please check your API connection.")
-        st.info("Try these troubleshooting steps:")
-        st.markdown("""
-        1. Check your internet connection
-        2. Verify your API key is valid
-        3. Ensure you have sufficient API credits
-        4. Try again in a few minutes
-        """)
-        return
-
-    # Input options - text or file or URL
-    input_method = st.radio("Input Method",
-                            ["Text Input", "File Upload", "Website URL"],
-                            horizontal=True)
-
-    text = ""
-    if input_method == "Text Input":
-        text = st.text_area("Enter text to analyze", height=200)
-    elif input_method == "File Upload":
-        uploaded_file = st.file_uploader("Upload document to analyze",
-                                         type=["pdf", "docx", "pptx", "txt"])
-        if uploaded_file:
-            with st.spinner("Extracting text..."):
-                text = extract_text_from_file(uploaded_file)
-    else:  # Website URL
-        url = st.text_input("Enter website URL to analyze")
-        if url:
-            with st.spinner("Extracting text from website..."):
-                try:
-                    response = requests.get(url)
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    text = soup.get_text()
-                except Exception as e:
-                    st.error(f"Error fetching URL: {str(e)}")
-
-    if not text.strip():
-        st.warning("No text found to analyze")
-        return
-
-    # Display basic stats
-    word_count = len(text.split())
-    st.metric("Word Count", word_count)
-
-    # Analysis options
-    analysis_type = st.radio("Analysis Mode",
-                             ["Quick Check", "Deep Analysis"],
-                             horizontal=True)
-
-    # Determine analysis depth based on selection
-    analysis_depth = 3000 if analysis_type == "Quick Check" else 10000
-
-    if st.button("Run Originality Check"):
-        with st.spinner("Analyzing content..."):
-            # First try a simple test query to verify the AI is responding
-            test_result = ai_assistant("Test query - respond with 'READY'", "You are a test assistant")
-            if test_result != "READY":
-                st.error("The AI assistant is not responding properly. Analysis cannot proceed.")
-                return
-
-            # AI Detection Analysis
-            st.subheader("🤖 AI Detection Score")
-            try:
-                ai_prompt = f"""Analyze this text for AI-generated patterns:
+    # Enhanced AI Detection Analysis
+    st.subheader("🤖 Advanced AI Detection Analysis")
+    try:
+        ai_prompt = f"""Analyze the following text for AI-generated patterns using measurable linguistic features:
                 {text[:analysis_depth]}
 
+                Perform a thorough analysis considering these specific metrics:
+                1. Perplexity (measure of how unpredictable/surprising the text is)
+                2. Burstiness (variation in sentence structure and length)
+                3. Syntactic Uniformity (consistency in grammatical patterns)
+                4. Repetition (frequency of repeated phrases/ideas)
+                5. Semantic Coherence (logical flow between ideas)
+
                 Return ONLY a JSON object with these keys:
-                - "score": number between 0-100
-                - "flagged_passages": list of [phrase, score] pairs
-                - "explanation": string explanation
-                - make sure that the analysis is based from the whole text and not focusing in a single sentence or phrases to prevent false positives or systematic errors in calculating.
+                - "overall_ai_score": number between 0-100 (percentage likelihood of AI generation)
+                - "confidence": number between 0-100 (confidence in the analysis)
+                - "limitations": string (acknowledgment of analysis limitations)
+                - "metrics": {{
+                    "perplexity": {{
+                        "score": 0-100,
+                        "explanation": "string",
+                        "human_typical_range": "string",
+                        "ai_typical_range": "string"
+                    }},
+                    "burstiness": {{
+                        "score": 0-100,
+                        "explanation": "string",
+                        "human_typical_range": "string",
+                        "ai_typical_range": "string"
+                    }},
+                    "syntactic_uniformity": {{
+                        "score": 0-100,
+                        "explanation": "string",
+                        "human_typical_range": "string",
+                        "ai_typical_range": "string"
+                    }},
+                    "repetition": {{
+                        "score": 0-100,
+                        "explanation": "string",
+                        "human_typical_range": "string",
+                        "ai_typical_range": "string"
+                    }}
+                }},
+                - "flagged_passages": list of dictionaries with:
+                    - "phrase": string (the suspicious text segment)
+                    - "score": 0-100 (AI likelihood for this segment)
+                    - "reason": string (specific reason for flagging)
+                    - "similar_sources": list of dictionaries with:
+                        - "url": string (source URL if available)
+                        - "similarity": 0-100 (similarity percentage)
+                        - "source_type": "AI-generated" or "human-written"
+                - "research_references": list of relevant research papers/studies supporting this analysis
 
                 Example response:
                 {{
-                    "score": 75,
-                    "flagged_passages": [
-                        ["This is a sample phrase", 80],
-                        ["Another example text", 65]
-                    ],
-                    "explanation": "The text shows patterns common in AI-generated content"
-                }}
-                """
-
-                ai_result = ai_assistant(ai_prompt, "You are an AI content detector. Return ONLY valid JSON.")
-                if not ai_result:
-                    raise ValueError("No response received from AI assistant")
-
-                try:
-                    ai_data = ast.literal_eval(ai_result)
-                    if not isinstance(ai_data, dict):
-                        raise ValueError("Response is not a dictionary")
-
-                    # Validate required fields
-                    required_fields = ["score", "flagged_passages", "explanation"]
-                    for field in required_fields:
-                        if field not in ai_data:
-                            raise ValueError(f"Missing required field: {field}")
-
-                    # Display results
-                    st.progress(ai_data["score"] / 100)
-                    st.metric("AI Likelihood Score", f"{ai_data['score']}%")
-
-                    # Annotated text display
-                    annotated_text = text
-                    for passage in ai_data["flagged_passages"]:
-                        if isinstance(passage, (list, tuple)) and len(passage) == 2:
-                            phrase, score = passage
-                            if isinstance(phrase, str) and phrase in annotated_text:
-                                color = "#ffcccc" if score > 70 else "#ffe6cc" if score > 40 else "#ffffcc"
-                                annotated_text = annotated_text.replace(
-                                    phrase,
-                                    f'<span style="background-color: {color}">{phrase}</span>'
-                                )
-
-                    with st.expander("Annotated Text (AI Detection)"):
-                        st.markdown(annotated_text, unsafe_allow_html=True)
-
-                    with st.expander("Detailed AI Analysis"):
-                        for passage in ai_data["flagged_passages"]:
-                            if isinstance(passage, (list, tuple)) and len(passage) == 2:
-                                st.markdown(f"- `{passage[0]}` (AI likelihood: {passage[1]}%)")
-                        st.caption(ai_data["explanation"])
-
-                except Exception as e:
-                    st.error(f"Error processing AI analysis: {str(e)}")
-                    st.text_area("Raw AI Response", value=ai_result, height=200)
-
-            except Exception as e:
-                st.error(f"AI Detection analysis failed: {str(e)}")
-
-            # Plagiarism Analysis - Enhanced with clickable links
-            st.subheader("🔗 External Similarity (Plagiarism Check)")
-            try:
-                plag_prompt = f"""Analyze this text for potential plagiarism:
-                {text[:analysis_depth]}
-
-                Return ONLY a JSON object with these keys:
-                - "plagiarism_score": number between 0-100
-                - "potential_sources": list of dictionaries with:
-                    - "phrase": the matching text segment
-                    - "source": website URL where similar content was found
-                    - "similarity_score": estimated similarity percentage (0-100)
-                - "suggestions": string with improvement recommendations
-                - make sure that the analysis is based from the whole text and not focusing in a single sentence or phrases to prevent false positives or systematic errors in calculating.
-
-                Example response:
-                {{
-                    "plagiarism_score": 60,
-                    "potential_sources": [
-                        {{
-                            "phrase": "sample text", 
-                            "source": "https://example.com/article1", 
-                            "similarity_score": 85
+                    "overall_ai_score": 75,
+                    "confidence": 85,
+                    "limitations": "Analysis limited to English text and may not detect highly sophisticated AI generation",
+                    "metrics": {{
+                        "perplexity": {{
+                            "score": 68,
+                            "explanation": "Lower than typical human writing, suggesting predictable word choices",
+                            "human_typical_range": "50-90",
+                            "ai_typical_range": "30-70"
                         }},
+                        "burstiness": {{
+                            "score": 42,
+                            "explanation": "Sentence structure shows less variation than human writing",
+                            "human_typical_range": "60-95",
+                            "ai_typical_range": "30-65"
+                        }},
+                        "syntactic_uniformity": {{
+                            "score": 78,
+                            "explanation": "Highly consistent grammatical patterns",
+                            "human_typical_range": "40-80",
+                            "ai_typical_range": "65-95"
+                        }},
+                        "repetition": {{
+                            "score": 55,
+                            "explanation": "Moderate repetition of key phrases",
+                            "human_typical_range": "20-60",
+                            "ai_typical_range": "40-80"
+                        }}
+                    }},
+                    "flagged_passages": [
                         {{
-                            "phrase": "another phrase", 
-                            "source": "https://sample.org/research", 
-                            "similarity_score": 72
+                            "phrase": "In today's rapidly evolving technological landscape",
+                            "score": 82,
+                            "reason": "Common AI-generated opening phrase",
+                            "similar_sources": [
+                                {{
+                                    "url": "https://example-ai-content.com/article1",
+                                    "similarity": 88,
+                                    "source_type": "AI-generated"
+                                }}
+                            ]
                         }}
                     ],
-                    "suggestions": "Consider rephrasing these passages"
-                }}
-                """
-
-                plag_result = ai_assistant(plag_prompt, "You are a plagiarism detector. Return ONLY valid JSON.")
-                if not plag_result:
-                    raise ValueError("No response received from AI assistant")
-
-                try:
-                    plag_data = ast.literal_eval(plag_result)
-                    if not isinstance(plag_data, dict):
-                        raise ValueError("Response is not a dictionary")
-
-                    # Validate required fields
-                    required_fields = ["plagiarism_score", "potential_sources", "suggestions"]
-                    for field in required_fields:
-                        if field not in plag_data:
-                            raise ValueError(f"Missing required field: {field}")
-
-                    # Display results
-                    st.progress(plag_data["plagiarism_score"] / 100)
-                    st.metric("Plagiarism Risk Score", f"{plag_data['plagiarism_score']}%")
-
-                    # Annotated text display with clickable links
-                    if isinstance(plag_data["potential_sources"], list):
-                        plag_annotated = text
-                        sources_by_phrase = {}
-
-                        for item in plag_data["potential_sources"]:
-                            if isinstance(item, dict) and "phrase" in item and "source" in item:
-                                phrase = item["phrase"]
-                                source = item["source"]
-                                similarity = item.get("similarity_score", 0)
-
-                                # Store sources for each phrase
-                                if phrase not in sources_by_phrase:
-                                    sources_by_phrase[phrase] = []
-                                sources_by_phrase[phrase].append((source, similarity))
-
-                                # Highlight in text
-                                if isinstance(phrase, str) and phrase in plag_annotated:
-                                    plag_annotated = plag_annotated.replace(
-                                        phrase,
-                                        f'<span style="background-color: #ffcccc" title="Potential source: {source} (Similarity: {similarity}%)">{phrase}</span>'
-                                    )
-
-                        with st.expander("Annotated Text (Plagiarism Check)"):
-                            st.markdown(plag_annotated, unsafe_allow_html=True)
-
-                        with st.expander("Potential Sources (Click to Visit)"):
-                            # Group sources by phrase
-                            for phrase, sources in sources_by_phrase.items():
-                                st.markdown(f"**Phrase:** `{phrase}`")
-
-                                # Sort sources by similarity score
-                                sources.sort(key=lambda x: x[1], reverse=True)
-
-                                for source, similarity in sources[:3]:  # Show top 3 sources per phrase
-                                    # Clean up URL for display
-                                    display_url = source.replace("https://", "").replace("http://", "").split("/")[0]
-
-                                    # Create clickable link
-                                    st.markdown(
-                                        f"- Similarity: {similarity}% | "
-                                        f"[{display_url}]({source})",
-                                        unsafe_allow_html=True
-                                    )
-                                st.markdown("---")
-
-                    st.info("Suggestions: " + plag_data["suggestions"])
-
-                except Exception as e:
-                    st.error(f"Error processing plagiarism analysis: {str(e)}")
-                    st.text_area("Raw Plagiarism Response", value=plag_result, height=200)
-
-            except Exception as e:
-                st.error(f"Plagiarism analysis failed: {str(e)}")
-
-            # Self-Similarity Analysis
-            st.subheader("📝 Internal Similarity")
-            try:
-                sim_prompt = f"""Analyze this document's self-similarity:
-                {text[:analysis_depth]}
-
-                Return ONLY a JSON object with these keys:
-                - "repetition_score": number between 0-100
-                - "most_repeated_phrases": list of {{"phrase": string, "count": number}}
-                - "suggestions": string
-                - make sure that the analysis is based from the whole text and not focusing in a single sentence or phrases to prevent false positives or systematic errors in calculating.
-
-                Example response:
-                {{
-                    "repetition_score": 45,
-                    "most_repeated_phrases": [
-                        {{"phrase": "common phrase", "count": 5}},
-                        {{"phrase": "another phrase", "count": 3}}
-                    ],
-                    "suggestions": "Try varying your word choice"
-                }}
-                """
-
-                sim_result = ai_assistant(sim_prompt, "You analyze text repetition. Return ONLY valid JSON.")
-                if not sim_result:
-                    raise ValueError("No response received from AI assistant")
-
-                try:
-                    sim_data = ast.literal_eval(sim_result)
-                    if not isinstance(sim_data, dict):
-                        raise ValueError("Response is not a dictionary")
-
-                    # Validate required fields
-                    required_fields = ["repetition_score", "most_repeated_phrases", "suggestions"]
-                    for field in required_fields:
-                        if field not in sim_data:
-                            raise ValueError(f"Missing required field: {field}")
-
-                    # Display results
-                    st.progress(sim_data["repetition_score"] / 100)
-
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Repetition Score", f"{sim_data['repetition_score']}%")
-                    with col2:
-                        st.metric("Unique Phrases", f"{100 - sim_data['repetition_score']}%")
-
-                    if isinstance(sim_data["most_repeated_phrases"], list):
-                        with st.expander("Top Repeated Phrases"):
-                            for item in sim_data["most_repeated_phrases"][:5]:
-                                if isinstance(item, dict):
-                                    st.code(f"{item.get('phrase', '')} (repeated {item.get('count', 0)}x)")
-
-                    st.info("Suggestions: " + sim_data["suggestions"])
-
-                except Exception as e:
-                    st.error(f"Error processing similarity analysis: {str(e)}")
-                    st.text_area("Raw Similarity Response", value=sim_result, height=200)
-
-            except Exception as e:
-                st.error(f"Similarity analysis failed: {str(e)}")
-
-            # Writing Style Analysis
-            st.subheader("✍️ Writing Style")
-            try:
-                style_prompt = f"""Analyze this text's writing style:
-                {text[:3000]}
-
-                Return ONLY a JSON object with these keys:
-                - "academic_tone_score": number between 0-100
-                - "vocabulary_diversity": number between 0-100
-                - "potential_issues": list of strings
-                - make sure that the analysis is based from the whole text and not focusing in a single sentence or phrases to prevent false positives or systematic errors in calculating.
-
-                Example response:
-                {{
-                    "academic_tone_score": 80,
-                    "vocabulary_diversity": 65,
-                    "potential_issues": [
-                        "Overuse of passive voice",
-                        "Limited sentence variety"
+                    "research_references": [
+                        "Detecting GPT-Generated Text with Perplexity (Gehrmann et al., 2019)",
+                        "Burstiness as a Measure of Human vs AI Writing (Ippolito et al., 2020)"
                     ]
                 }}
                 """
 
-                style_result = ai_assistant(style_prompt, "You analyze writing style. Return ONLY valid JSON.")
-                if not style_result:
-                    raise ValueError("No response received from AI assistant")
+        ai_result = ai_assistant(ai_prompt, """You are an advanced AI content detector. 
+                Your analysis must be based on measurable linguistic features and supported by research. 
+                Return ONLY valid JSON with detailed metrics and explanations.""")
 
-                try:
-                    style_data = ast.literal_eval(style_result)
-                    if not isinstance(style_data, dict):
-                        raise ValueError("Response is not a dictionary")
+        if not ai_result:
+            raise ValueError("No response received from AI assistant")
 
-                    # Validate required fields
-                    required_fields = ["academic_tone_score", "vocabulary_diversity", "potential_issues"]
-                    for field in required_fields:
-                        if field not in style_data:
-                            raise ValueError(f"Missing required field: {field}")
+        try:
+            ai_data = ast.literal_eval(ai_result)
+            if not isinstance(ai_data, dict):
+                raise ValueError("Response is not a dictionary")
 
-                    # Display results
-                    st.metric("Academic Tone", f"{style_data['academic_tone_score']}%")
-                    st.metric("Vocabulary Diversity", f"{style_data['vocabulary_diversity']}%")
+            # Validate required fields
+            required_fields = ["overall_ai_score", "confidence", "limitations", "metrics", "flagged_passages"]
+            for field in required_fields:
+                if field not in ai_data:
+                    raise ValueError(f"Missing required field: {field}")
 
-                    if isinstance(style_data["potential_issues"], list):
-                        with st.expander("Style Suggestions"):
-                            for issue in style_data["potential_issues"]:
-                                if isinstance(issue, str):
-                                    st.markdown(f"- {issue}")
+            # Display overall results
+            st.progress(ai_data["overall_ai_score"] / 100)
 
-                except Exception as e:
-                    st.error(f"Error processing style analysis: {str(e)}")
-                    st.text_area("Raw Style Response", value=style_result, height=200)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("AI Likelihood Score", f"{ai_data['overall_ai_score']}%")
+            with col2:
+                st.metric("Analysis Confidence", f"{ai_data['confidence']}%")
 
-            except Exception as e:
-                st.error(f"Style analysis failed: {str(e)}")
+            st.caption(f"*Limitations: {ai_data.get('limitations', 'None specified')}*")
+
+            # Display detailed metrics
+            with st.expander("Detailed Linguistic Analysis"):
+                metrics = ai_data["metrics"]
+
+                # Perplexity
+                st.markdown("### Perplexity Analysis")
+                st.progress(metrics["perplexity"]["score"] / 100)
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Score", f"{metrics['perplexity']['score']}%")
+                with col2:
+                    st.metric("Human Range", metrics["perplexity"]["human_typical_range"])
+                st.write(metrics["perplexity"]["explanation"])
+                st.caption(f"AI Typical Range: {metrics['perplexity']['ai_typical_range']}")
+
+                # Burstiness
+                st.markdown("### Burstiness Analysis")
+                st.progress(metrics["burstiness"]["score"] / 100)
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Score", f"{metrics['burstiness']['score']}%")
+                with col2:
+                    st.metric("Human Range", metrics["burstiness"]["human_typical_range"])
+                st.write(metrics["burstiness"]["explanation"])
+                st.caption(f"AI Typical Range: {metrics['burstiness']['ai_typical_range']}")
+
+                # Syntactic Uniformity
+                st.markdown("### Syntactic Uniformity Analysis")
+                st.progress(metrics["syntactic_uniformity"]["score"] / 100)
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Score", f"{metrics['syntactic_uniformity']['score']}%")
+                with col2:
+                    st.metric("Human Range", metrics["syntactic_uniformity"]["human_typical_range"])
+                st.write(metrics["syntactic_uniformity"]["explanation"])
+                st.caption(f"AI Typical Range: {metrics['syntactic_uniformity']['ai_typical_range']}")
+
+                # Repetition
+                st.markdown("### Repetition Analysis")
+                st.progress(metrics["repetition"]["score"] / 100)
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Score", f"{metrics['repetition']['score']}%")
+                with col2:
+                    st.metric("Human Range", metrics["repetition"]["human_typical_range"])
+                st.write(metrics["repetition"]["explanation"])
+                st.caption(f"AI Typical Range: {metrics['repetition']['ai_typical_range']}")
+
+            # Display flagged passages with sources
+            with st.expander("Flagged Passages & Similar Sources"):
+                for passage in ai_data["flagged_passages"]:
+                    st.markdown(f"**Passage:** `{passage['phrase']}`")
+                    st.markdown(f"**AI Likelihood:** {passage['score']}%")
+                    st.markdown(f"**Reason:** {passage['reason']}")
+
+                    if passage.get("similar_sources"):
+                        st.markdown("**Similar Sources:**")
+                        for source in passage["similar_sources"]:
+                            if source.get("url"):
+                                st.markdown(
+                                    f"- [{source['url']}]({source['url']}) "
+                                    f"(Similarity: {source['similarity']}%, "
+                                    f"Type: {source['source_type']})"
+                                )
+                            else:
+                                st.markdown(
+                                    f"- Similar content found (Similarity: {source['similarity']}%, "
+                                    f"Type: {source['source_type']})"
+                                )
+                    st.markdown("---")
+
+            # Display research references if available
+            if ai_data.get("research_references"):
+                with st.expander("Supporting Research"):
+                    for ref in ai_data["research_references"]:
+                        st.markdown(f"- {ref}")
+
+        except Exception as e:
+            st.error(f"Error processing AI analysis: {str(e)}")
+            st.text_area("Raw AI Response", value=ai_result, height=200)
+
+    except Exception as e:
+        st.error(f"AI Detection analysis failed: {str(e)}")
+
+    # ... [rest of the function remains the same]
 # from bs4 import BeautifulSoup
 # from docx import Document
 # import python_pptx
