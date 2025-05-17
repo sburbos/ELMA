@@ -24,43 +24,52 @@ st.set_page_config(
 )
 st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 
+#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
+#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
+import requests
 
 def ai_assistant(prompt, rule):
-    try:
-        headers = {
-            "Authorization": f"Bearer {st.secrets.openrouter.OPENAI_API_KEY}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://lley-ai.streamlit.app/",
-            "X-Title": "LleY Ai"
-        }
+    keys = st.secrets.openrouter.API_KEYS
+    base_url = "https://openrouter.ai/api/v1/chat/completions"
 
-        if isinstance(prompt, list):
-            messages = prompt
-        else:
-            messages = [
+    for key in keys:
+        try:
+            headers = {
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://lley-ai.streamlit.app/",
+                "X-Title": "LleY Ai"
+            }
+
+            messages = prompt if isinstance(prompt, list) else [
                 {"role": "system", "content": rule},
                 {"role": "user", "content": prompt}
             ]
 
-        data = {
-            "model": "nousresearch/deephermes-3-mistral-24b-preview:free",
-            "messages": messages,
-            "max_tokens": 2048
-        }
+            data = {
+                "model": "mistralai/mistral-7b-instruct:free",
+                "messages": messages,
+                "max_tokens": 2048
+            }
 
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data)
+            response = requests.post(base_url, headers=headers, json=data)
 
-        if response.status_code == 200:
-            result = response.json()
-            st.code(result)  # 👈 shows raw JSON output
-            return result["choices"][0]["message"]["content"]
-        else:
-            st.error(f"OpenRouter Error {response.status_code}: {response.text}")
-            return None
+            if response.status_code == 200:
+                return response.json()["choices"][0]["message"]["content"]
+            elif response.status_code == 429:
+                st.warning(f"⚠️ API key ending in ...{key[-4:]} hit rate limit. Trying next key...")
+                continue  # Try the next key
+            else:
+                st.error(f"❌ OpenRouter Error {response.status_code}: {response.text}")
+                continue
 
-    except Exception as e:
-        st.error(f"AI assistant error: {str(e)}")
-        return None
+        except Exception as e:
+            st.warning(f"⚠️ Failed with key ...{key[-4:]}, trying next. Error: {e}")
+            continue
+
+    st.error("🚫 All API keys failed or exceeded their limits.")
+    return None
+
 
 
 def main_page():
