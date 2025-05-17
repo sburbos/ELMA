@@ -650,7 +650,7 @@ def aito():
         st.chat_message("user").write(prompt)
 
         # Get AI response with full conversation history
-        response = ai_assistant(st.session_state.messages, extra = "You Are AITO an AI CHATBOT")
+        response = ai_assistant(st.session_state.messages, extra = "")
 
         if response:
             # Add AI response to chat history
