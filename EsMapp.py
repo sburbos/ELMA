@@ -677,7 +677,7 @@ def pdf2quiz():
             reader = PyPDF2.PdfReader(pdf_file)
             pdf_text = []
             for page in reader.pages:
-                content = page.extracft_text()
+                content = page.extract_text()
                 if content:  # Only add if text was extracted
                     pdf_text.append(content)
             return "\n".join(pdf_text) if pdf_text else "No text could be extracted from the PDF."
