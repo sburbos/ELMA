@@ -719,7 +719,16 @@ def pdf2quiz():
                         }"""
 
     # [Previous code remains the same until the answer evaluation section]
-
+    if 'quiz' not in st.session_state:
+        st.session_state.quiz = {
+            'data': None,
+            'answers': {},
+            'submitted': False,
+            'file_processed': None,
+            'file_type': None,
+            'quiz_type': 'multiple_choice',
+            'scores': {}
+        }
     if st.session_state.quiz['quiz_type'] == 'open_ended':
         # For open-ended questions, we need to score each answer
         with st.spinner("Evaluating your answers..."):
@@ -792,7 +801,7 @@ def pdf2quiz():
 # [Rest of the previous code remains the same]
 
 # Update the display section to show the new evaluation format
-if st.session_state.quiz['submitted']:
+if 'quiz' in st.session_state and 'submitted' in st.session_state.quiz and st.session_state.quiz['submitted']:
     if st.session_state.quiz['quiz_type'] == 'open_ended':
         # For open-ended questions, we need to score each answer
         with st.spinner("Evaluating your answers..."):
