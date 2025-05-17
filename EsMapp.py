@@ -32,29 +32,32 @@ st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 
 
 def ai_assistant(prompt):
-    """Simple Gemini API implementation that just returns the response"""
+    """Simple Gemini API implementation that returns response or None"""
     try:
-        # Configure API (using secrets)
-        genai.configure(api_key=st.secrets.google.API_KEY)
+        # Configure API - using direct key (replace with your actual key)
+        genai.configure(api_key="AIzaSyC5Vn0GQEbvGKRvPkwm42i0ZZYt0ChK-Xs")
 
-        # Initialize model with latest version
+        # Initialize model with current recommended version
         model = genai.GenerativeModel("gemini-1.5-flash")
 
-        # Handle both string prompts and chat history
-        if isinstance(prompt, list):  # Chat history
-            chat = model.start_chat(history=[])
-            response = None  # Initialize response variable
-            for msg in prompt:
-                if msg["role"] == "user":
-                    response = chat.send_message(msg["content"])
-            return response.text if response and hasattr(response, 'text') else None
-        else:  # Single prompt
+        # Handle single string prompt
+        if isinstance(prompt, str):
             response = model.generate_content(prompt)
             return response.text if hasattr(response, 'text') else None
 
-    except Exception:
-        return None
+        # Handle chat history (list of messages)
+        elif isinstance(prompt, list):
+            chat = model.start_chat(history=[])
+            response = None
+            for msg in prompt:
+                if msg.get("role") == "user":
+                    response = chat.send_message(msg.get("content", ""))
+            return response.text if response and hasattr(response, 'text') else None
 
+    except Exception as e:
+        print(f"API Error: {str(e)}")  # Basic error logging
+        return None
+    
 def main_page():
     st.markdown("""
     <style>
