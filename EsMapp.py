@@ -9,6 +9,9 @@ from io import StringIO
 import ast
 from streamlit.components.v1 import html
 import math
+from bs4 import BeautifulSoup
+import numpy as np
+from difflib import SequenceMatcher
 
 # Initialize the OpenAI client with proper configuration
 
@@ -670,38 +673,36 @@ def aito():
             st.session_state.messages.append({"role": "assistant", "content": response})
             st.chat_message("assistant").write(response)
 
+def extract_pdf_text(pdf_file: str) -> str:
+    try:
+        reader = PyPDF2.PdfReader(pdf_file)
+        pdf_text = []
+        for page in reader.pages:
+            content = page.extract_text()
+            if content:  # Only add if text was extracted
+                pdf_text.append(content)
+        return "\n".join(pdf_text) if pdf_text else "No text could be extracted from the PDF."
+    except Exception as f:
+        st.error(f"Error reading PDF: {str(f)}")
+        return None
 
+def extract_pptx_text(pptx_file):
+    try:
+        from pptx import Presentation
+        prs = Presentation(pptx_file)
+        text = []
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if hasattr(shape, "text"):
+                    text.append(shape.text)
+        return "\n".join(text) if text else "No text could be extracted from the PPTX."
+    except ImportError:
+        st.error("Please install python-pptx package: pip install python-pptx")
+        return None
+    except Exception as d:
+        st.error(f"Error reading PPTX: {str(d)}")
+        return None
 def pdf2quiz():
-    def extract_pdf_text(pdf_file: str) -> str:
-        try:
-            reader = PyPDF2.PdfReader(pdf_file)
-            pdf_text = []
-            for page in reader.pages:
-                content = page.extract_text()
-                if content:  # Only add if text was extracted
-                    pdf_text.append(content)
-            return "\n".join(pdf_text) if pdf_text else "No text could be extracted from the PDF."
-        except Exception as f:
-            st.error(f"Error reading PDF: {str(f)}")
-            return None
-
-    def extract_pptx_text(pptx_file):
-        try:
-            from pptx import Presentation
-            prs = Presentation(pptx_file)
-            text = []
-            for slide in prs.slides:
-                for shape in slide.shapes:
-                    if hasattr(shape, "text"):
-                        text.append(shape.text)
-            return "\n".join(text) if text else "No text could be extracted from the PPTX."
-        except ImportError:
-            st.error("Please install python-pptx package: pip install python-pptx")
-            return None
-        except Exception as d:
-            st.error(f"Error reading PPTX: {str(d)}")
-            return None
-
     # System prompts for different quiz types
     system_condition_mcq = """You are a system only for creating a multiple choice quiz python dictionary. 
                         Return ONLY a properly formatted Python dictionary with no additional text or explanation.
@@ -979,13 +980,89 @@ def pdf2quiz():
                 max_score = 10 * len(st.session_state.quiz['data'])
                 st.success(f"Your total score: {total_score}/{max_score} ({round(total_score / max_score * 100, 1)}%)")
 
+
+def image_to_text():
+    st.title("🖼️ Image to Text Analyzer")
+    st.caption("Local OCR + Plagiarism Check + AI Analysis")
+
+    uploaded_file = st.file_uploader("Upload an image", type=["jpg", "png", "jpeg"])
+
+    if uploaded_file:
+        img = Image.open(uploaded_file)
+        st.image(img, caption="Uploaded Image", use_column_width=True)
+
+        # Step 1: Extract text
+        with st.spinner("Extracting text..."):
+            extracted_text = pytesseract.image_to_string(img)
+
+        if not extracted_text.strip():
+            st.warning("No text found in image")
+            return
+
+        st.text_area("Extracted Text", extracted_text, height=200)
+
+        # Step 2: Plagiarism check
+        st.subheader("🔍 Plagiarism Analysis")
+        website_url = st.text_input("Compare with website URL:", placeholder="https://example.com")
+
+        if website_url and st.button("Check Similarity"):
+            with st.spinner("Analyzing website content..."):
+                try:
+                    # Get website text
+                    response = requests.get(website_url, timeout=10)
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    website_text = ' '.join([p.get_text() for p in soup.find_all('p')])
+
+                    # Compare similarity
+                    similarity = SequenceMatcher(None, extracted_text, website_text).ratio()
+                    st.progress(similarity)
+                    st.write(f"Overall similarity: {similarity * 100:.1f}%")
+
+                    # Highlight matching phrases
+                    matcher = SequenceMatcher(None, extracted_text, website_text)
+                    matches = matcher.get_matching_blocks()
+
+                    st.subheader("📌 Matching Content")
+                    for match in sorted(matches, key=lambda x: x.size, reverse=True)[:5]:  # Top 5 matches
+                        if match.size > 10:  # Only show substantial matches
+                            matched_text = extracted_text[match.a:match.a + match.size]
+                            st.markdown(f"""
+                            **Similarity {match.size} chars:**  
+                            > `{matched_text.strip()}`  
+                            """)
+
+                except Exception as e:
+                    st.error(f"Error analyzing website: {str(e)}")
+
+        # Step 3: AI Content Analysis
+        st.subheader("🤖 AI Similarity Check")
+        if st.button("Check AI Similarity"):
+            with st.spinner("Analyzing with AI..."):
+                prompt = f"""
+                Analyze this text for AI-generated patterns and annotate similarities:
+
+                TEXT TO ANALYZE:
+                {extracted_text[:3000]}  # Limit to first 3000 chars
+
+                INSTRUCTIONS:
+                1. Identify phrases that sound AI-generated
+                2. Mark highly similar sentence structures
+                3. Annotate with '[SIMILARITY DETECTED]' 
+                4. Provide confidence score (1-10)
+                """
+
+                analysis = ai_assistant(prompt, "You are a plagiarism detection AI")
+
+                st.text_area("AI Analysis Results", analysis, height=300)
+
 def about():
     st.title("About")
 
 pages={ "Tools": [st.Page(main_page, title="Home"), st.Page(aito, title="AITO"),
                   st.Page(esma, title="Essay Maker"),
                   st.Page(tetos, title="Text To Speech"),
-                  st.Page(pdf2quiz, title="Pdf To Quiz")],
+                  st.Page(pdf2quiz, title="Pdf To Quiz"),
+                  st.Page(image_to_text, title="Image to Text Analyzer"),],
         "About": [st.Page(about, title="About")],
 
         }

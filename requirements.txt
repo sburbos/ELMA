@@ -1,4 +1,6 @@
 streamlit
+beautifulsoup4
+
 openai
 python-pptx
 edge-tts
