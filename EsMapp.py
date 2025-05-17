@@ -51,7 +51,7 @@ def ai_assistant(prompt, rule):
         genai.configure(
             api_key=st.secrets.google.API_KEY,
             transport='rest',
-            timeout=30
+            timeout=200
         )
 
         # 3. Initialize model with optimized settings
@@ -137,7 +137,7 @@ def ai_assistant(prompt, rule):
             """)
 
         return None
-    
+
 def main_page():
     st.markdown("""
     <style>
