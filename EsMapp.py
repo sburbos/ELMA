@@ -32,26 +32,33 @@ st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 
 
 def ai_assistant(prompt, rule):
-    """Fully working Google Gemini API implementation"""
+    """Enhanced Google Gemini API implementation with better error handling and security"""
     try:
-        # 1. Validate API key configuration
-        if "google" not in st.secrets or "API_KEY" not in st.secrets.google:
+        # 1. Validate API key configuration more securely
+        if not hasattr(st, 'secrets') or not hasattr(st.secrets, 'google') or not st.secrets.google.get("API_KEY"):
             st.error("""
-            🔑 Missing API Configuration:
-            Please add to .streamlit/secrets.toml:
+            🔑 Missing or Invalid API Configuration:
+            Please ensure you have:
+            1. Created a .streamlit/secrets.toml file
+            2. Added your Google API key like this:
+
             [google]
-            API_KEY = "your_actual_api_key"
+            API_KEY = "your_actual_api_key_here"
             """)
             return None
 
-        # 2. Configure API - this is the verified working method
-        genai.configure(api_key=st.secrets.google.API_KEY)
+        # 2. Configure API with timeout
+        genai.configure(
+            api_key=st.secrets.google.API_KEY,
+            transport='rest',  # More reliable than default
+            timeout=30  # 30 second timeout
+        )
 
-        # 3. Initialize model with safety settings
+        # 3. Initialize model with optimized settings
         generation_config = {
             "temperature": 0.7,
-            "top_p": 0.9,
-            "top_k": 40,
+            "top_p": 1.0,  # More creative responses
+            "top_k": 0,  # Disable top_k sampling for more predictable results
             "max_output_tokens": 2048,
         }
 
@@ -63,41 +70,82 @@ def ai_assistant(prompt, rule):
         ]
 
         model = genai.GenerativeModel(
-            'gemini-1.5-flash',
+            'gemini-1.5-flash',  # Using the latest model
             generation_config=generation_config,
             safety_settings=safety_settings
         )
 
-        # 4. Process input based on type
+        # 4. Process input with better prompt engineering
         if isinstance(prompt, list):  # Chat history
             chat = model.start_chat(history=[])
+
+            # Prepend system message if rule exists
+            if rule:
+                chat.send_message(f"System instructions: {rule}")
+
             for msg in prompt:
-                if msg["role"] == "system":
-                    chat.send_message(f"System instruction: {msg['content']}")
-                else:
+                if msg["role"] == "user":
                     response = chat.send_message(msg["content"])
-            return response.text if response else None
-        else:  # Single prompt
-            full_prompt = f"{rule}\n\n{prompt}" if rule else prompt
-            response = model.generate_content(full_prompt)
+                elif msg["role"] == "assistant":
+                    # Add assistant responses to history
+                    chat.history.append({
+                        "role": "model",
+                        "parts": [msg["content"]]
+                    })
+
             return response.text if response else None
 
-    except genai.types.BlockedPromptError:
-        st.error("🚫 Response blocked by safety filters")
-        return None
-    except Exception as e:
+        else:  # Single prompt
+            full_prompt = f"""
+            {rule if rule else 'You are a helpful AI assistant. Provide detailed, accurate responses.'}
+
+            User request:
+            {prompt}
+
+            Please respond with clear, well-structured information.
+            """
+
+            response = model.generate_content(full_prompt)
+
+            # Better response validation
+            if not response or not response.text:
+                st.warning("The AI didn't return any content. Try simplifying your request.")
+                return None
+
+            return response.text
+
+    except genai.types.BlockedPromptError as e:
         st.error(f"""
-        ⚠️ API Connection Error:
+        🚫 Content blocked by safety filters:
         {str(e)}
 
-        🔧 Troubleshooting Steps:
-        1. Verify API key at https://aistudio.google.com/
-        2. Run: pip install --upgrade google-generativeai
-        3. Check your internet connection
-        4. Try a simpler prompt
+        Try rephrasing your request to be more neutral.
         """)
         return None
 
+    except genai.types.StopCandidateException as e:
+        st.error(f"""
+        ⚠️ Generation stopped unexpectedly:
+        {str(e)}
+
+        This usually means the response was incomplete.
+        Try breaking your request into smaller parts.
+        """)
+        return None
+
+    except Exception as e:
+        st.error(f"""
+        ⚠️ Critical API Error:
+        {str(e)}
+
+        🔧 Troubleshooting Steps:
+        1. Check your internet connection
+        2. Verify API key at https://aistudio.google.com/
+        3. Ensure you have API quota remaining
+        4. Try again in a few minutes
+        5. Contact support if issue persists
+        """)
+        return None
 def main_page():
     st.markdown("""
     <style>
