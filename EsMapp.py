@@ -22,86 +22,45 @@ st.set_page_config(
     layout="wide"
 )
 st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
-try:
-    # Access nested secrets
-    api_key = st.secrets.openrouter.OPENAI_API_KEY
-    base_url = st.secrets.openrouter.OPENAI_BASE_URL
-
-    client = OpenAI(
-        api_key=api_key,
-        base_url=base_url
-    )
-
-    # Test connection with a simple model list request
-    try:
-        models = client.models.list()
-        if not models.data:
-            st.error("API connection succeeded but no models available. Check your OpenRouter plan.")
-            st.stop()
-    except Exception as test_error:
-        st.error(f"API test failed: {str(test_error)}")
-        st.stop()
-
-except AttributeError as e:
-    st.error(f"""
-    Secret configuration error: {str(e)}
-    Current secret structure: {dict(st.secrets)}
-    Required structure:
-    ```
-    [openrouter]
-    OPENAI_API_KEY = "your-api-key-here"
-    OPENAI_BASE_URL = "https://openrouter.ai/api/v1"
-    ```
-    """)
-    st.stop()
-except Exception as d:
-    st.error(f"API connection failed: {str(d)}")
-    st.stop()
 
 
 def ai_assistant(prompt, rule):
     try:
-        # First check if client is properly initialized
-        if not client:
-            st.error("AI client not initialized")
+        headers = {
+            "Authorization": f"Bearer {st.secrets.openrouter.OPENAI_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://lley-ai.streamlit.app/",
+            "X-Title": "LleY Ai"
+        }
+
+        if isinstance(prompt, list):
+            messages = prompt
+        else:
+            messages = [
+                {"role": "system", "content": rule},
+                {"role": "user", "content": prompt}
+            ]
+
+        data = {
+            "model": "nousresearch/deephermes-3-mistral-24b-preview:free",
+            "messages": messages,
+            "max_tokens": 2048
+        }
+
+        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data)
+
+        if response.status_code == 200:
+            result = response.json()
+            st.code(result)  # 👈 shows raw JSON output
+            return result["choices"][0]["message"]["content"]
+        else:
+            st.error(f"OpenRouter Error {response.status_code}: {response.text}")
             return None
 
-        response = client.chat.completions.create(
-            model="nousresearch/deephermes-3-mistral-24b-preview:free",
-            extra_headers={
-                "HTTP-Referer": "https://lley-ai.streamlit.app/",
-                "X-Title": "LleY Ai",
-            },
-            messages=[
-                {
-                    "role": "system",
-                    "content": rule 
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            max_tokens=90000,
-            temperature=0.7
-        )
-
-        if not response.choices:
-            st.error("Received empty response from AI")
-            return None
-
-        return response.choices[0].message.content
-
-    except Exception as det:
-        st.error(f"Failed to generate response: {str(det)}")
-        # Add more specific error handling
-        if "rate limit" in str(det).lower():
-            st.warning("You've hit the rate limit. Please wait before making more requests.")
-        elif "authentication" in str(det).lower():
-            st.error("Authentication failed. Please check your API key.")
-        elif "connection" in str(det).lower():
-            st.error("Connection error. Please check your internet connection.")
+    except Exception as e:
+        st.error(f"AI assistant error: {str(e)}")
         return None
+
 
 def main_page():
     st.markdown("""
