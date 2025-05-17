@@ -39,7 +39,7 @@ def ai_assistant(prompt, rule):
         genai.configure(api_key=st.secrets.google.API_KEY)  # Use Streamlit secrets
         logging.info("Google Generative AI API successfully configured.")
 
-        model_name = 'gemini-pro'  # Or specify your model
+        model_name = 'models/gemini-2.0-flash'  # Or specify your model
         logging.info(f"Using model: {model_name}")
         model = genai.GenerativeModel(model_name)
 
