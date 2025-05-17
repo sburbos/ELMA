@@ -1046,6 +1046,39 @@ def pdf2quiz():
 # [Rest of the previous code remains the same]
 
 # Update the display section to show the new evaluation format
+if st.session_state.quiz['submitted']:
+    if st.session_state.quiz['quiz_type'] == 'multiple_choice':
+    # [Multiple choice display remains the same]
+    else:
+        if q_num in st.session_state.quiz.get('scores', {}):
+            score_data = st.session_state.quiz['scores'][q_num]
+            st.markdown(f"**Score: {score_data.get('score', 0)}/10**")
+            st.markdown(f"**Explanation:** {score_data.get('explanation', 'No explanation provided')}")
+            st.markdown(f"**Feedback:** {score_data.get('feedback', 'No feedback provided')}")
+
+            if 'strengths' in score_data and score_data['strengths']:
+                st.markdown("**Strengths:**")
+                for strength in score_data['strengths']:
+                    st.markdown(f"- {strength}")
+
+            if 'weaknesses' in score_data and score_data['weaknesses']:
+                st.markdown("**Areas for Improvement:**")
+                for weakness in score_data['weaknesses']:
+                    st.markdown(f"- {weakness}")
+
+            with st.expander("View Model Answer and Criteria"):
+                st.markdown("**Model Answer:**")
+                st.info(question.get('model_answer', 'No model answer provided'))
+
+                if 'scoring_criteria' in question and question['scoring_criteria']:
+                    st.markdown("**Scoring Criteria:**")
+                    for criterion in question['scoring_criteria']:
+                        st.markdown(f"- {criterion}")
+
+
+# [Rest of the previous code remains the same]
+
+# Update the display section to show the new evaluation format
 if 'quiz' in st.session_state and 'submitted' in st.session_state.quiz and st.session_state.quiz['submitted']:
     if st.session_state.quiz['quiz_type'] == 'open_ended':
         # For open-ended questions, we need to score each answer
