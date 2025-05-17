@@ -4,7 +4,7 @@ import openai
 import tempfile
 from attr import NothingType
 from openai import OpenAI
-from google import genai
+from google.generativeai import genai
 import edge_tts
 import asyncio
 import PyPDF2
