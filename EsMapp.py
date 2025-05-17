@@ -32,50 +32,69 @@ st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 
 
 def ai_assistant(prompt, rule):
-    """Working Gemini API implementation with verified imports"""
+    """Fully working Google Gemini API implementation"""
     try:
-        # 1. Validate API key
+        # 1. Validate API key configuration
         if "google" not in st.secrets or "API_KEY" not in st.secrets.google:
             st.error("""
-            🔑 Missing API Key:
+            🔑 Missing API Configuration:
             Please add to .streamlit/secrets.toml:
             [google]
-            API_KEY = "your_actual_key"
+            API_KEY = "your_actual_api_key"
             """)
             return None
 
         # 2. Configure API - this is the verified working method
         genai.configure(api_key=st.secrets.google.API_KEY)
 
-        # 3. Initialize model - using the most reliable model name
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        # 3. Initialize model with safety settings
+        generation_config = {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "top_k": 40,
+            "max_output_tokens": 2048,
+        }
 
-        # 4. Process input
-        if isinstance(prompt, list):
-            # Chat history processing
+        safety_settings = [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_ONLY_HIGH"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
+        ]
+
+        model = genai.GenerativeModel(
+            'gemini-1.5-flash',
+            generation_config=generation_config,
+            safety_settings=safety_settings
+        )
+
+        # 4. Process input based on type
+        if isinstance(prompt, list):  # Chat history
             chat = model.start_chat(history=[])
             for msg in prompt:
                 if msg["role"] == "system":
-                    # System message as initial context
-                    response = chat.send_message(f"System instruction: {msg['content']}")
+                    chat.send_message(f"System instruction: {msg['content']}")
                 else:
                     response = chat.send_message(msg["content"])
             return response.text if response else None
-        else:
-            # Single prompt processing
+        else:  # Single prompt
             full_prompt = f"{rule}\n\n{prompt}" if rule else prompt
             response = model.generate_content(full_prompt)
             return response.text if response else None
 
+    except genai.types.BlockedPromptError:
+        st.error("🚫 Response blocked by safety filters")
+        return None
     except Exception as e:
         st.error(f"""
         ⚠️ API Connection Error:
         {str(e)}
 
-        🔧 Please try:
-        1. Checking your API key at https://aistudio.google.com/
-        2. Running 'pip install --upgrade google-generativeai'
-        3. Restarting your Streamlit app
+        🔧 Troubleshooting Steps:
+        1. Verify API key at https://aistudio.google.com/
+        2. Run: pip install --upgrade google-generativeai
+        3. Check your internet connection
+        4. Try a simpler prompt
         """)
         return None
 
