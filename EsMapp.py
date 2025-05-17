@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 import numpy as np
 from difflib import SequenceMatcher
 import os
+import requests
 
 # Initialize the OpenAI client with proper configuration
 
