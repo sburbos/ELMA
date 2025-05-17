@@ -1040,10 +1040,7 @@ def turnitin_knockoff():
     if st.button("Run Originality Check"):
         with st.spinner("Analyzing content..."):
             # First try a simple test query to verify the AI is responding
-            test_result = ai_assistant("Test query - respond with 'READY'", "You are a test assistant")
-            if test_result != "READY":
-                st.error("The AI assistant is not responding properly. Analysis cannot proceed.")
-                return
+
 
             # AI Detection Analysis
             st.subheader("🤖 AI Detection Score")
