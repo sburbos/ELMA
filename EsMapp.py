@@ -32,7 +32,7 @@ import requests
 def ai_assistant(prompt, rule):
     genai.configure(api_key=st.secrets.google.API_KEY)  # Use Streamlit secrets
 
-    model = genai.GenerativeModel('gemini-pro')  # Or specify your model
+    model = genai.GenerativeModel('gemini-2.0-flash')  # Or specify your model
 
     messages = prompt if isinstance(prompt, list) else [
         {"role": "system", "content": rule},
