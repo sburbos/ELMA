@@ -991,9 +991,6 @@ def extract_text_from_file(uploaded_file):
     return text
 
 
-import json  # Add this at the top of your file
-
-
 def turnitin_knockoff():
     st.title("🔍 Originality Checker")
     st.caption("Academic integrity analysis inspired by Turnitin")
@@ -1069,8 +1066,16 @@ def turnitin_knockoff():
                     raise ValueError("No response received from AI assistant")
 
                 try:
-                    # FIX: Use json.loads() instead of ast.literal_eval()
-                    ai_data = json.loads(ai_result.strip())
+                    # Clean the response by removing potential markdown code blocks
+                    clean_result = ai_result.strip()
+                    if clean_result.startswith("```json"):
+                        clean_result = clean_result[7:]
+                    if clean_result.startswith("```"):
+                        clean_result = clean_result[3:]
+                    if clean_result.endswith("```"):
+                        clean_result = clean_result[:-3]
+
+                    ai_data = json.loads(clean_result)
 
                     # Validate required fields
                     required_fields = ["score", "flagged_passages", "explanation"]
@@ -1103,9 +1108,6 @@ def turnitin_knockoff():
                                 st.markdown(f"- `{passage[0]}` (AI likelihood: {passage[1]}%)")
                         st.caption(ai_data["explanation"])
 
-                except json.JSONDecodeError as e:
-                    st.error(f"Invalid JSON response from AI: {str(e)}")
-                    st.text_area("Raw AI Response", value=ai_result, height=200)
                 except Exception as e:
                     st.error(f"Error processing AI analysis: {str(e)}")
                     st.text_area("Raw AI Response", value=ai_result, height=200)
@@ -1152,8 +1154,16 @@ def turnitin_knockoff():
                     raise ValueError("No response received from AI assistant")
 
                 try:
-                    # FIX: Use json.loads() instead of ast.literal_eval()
-                    plag_data = json.loads(plag_result.strip())
+                    # Clean the response
+                    clean_result = plag_result.strip()
+                    if clean_result.startswith("```json"):
+                        clean_result = clean_result[7:]
+                    if clean_result.startswith("```"):
+                        clean_result = clean_result[3:]
+                    if clean_result.endswith("```"):
+                        clean_result = clean_result[:-3]
+
+                    plag_data = json.loads(clean_result)
 
                     # Validate required fields
                     required_fields = ["plagiarism_score", "potential_sources", "suggestions"]
@@ -1213,9 +1223,6 @@ def turnitin_knockoff():
 
                     st.info("Suggestions: " + plag_data["suggestions"])
 
-                except json.JSONDecodeError as e:
-                    st.error(f"Invalid JSON response from AI: {str(e)}")
-                    st.text_area("Raw Plagiarism Response", value=plag_result, height=200)
                 except Exception as e:
                     st.error(f"Error processing plagiarism analysis: {str(e)}")
                     st.text_area("Raw Plagiarism Response", value=plag_result, height=200)
@@ -1251,8 +1258,16 @@ def turnitin_knockoff():
                     raise ValueError("No response received from AI assistant")
 
                 try:
-                    # FIX: Use json.loads() instead of ast.literal_eval()
-                    sim_data = json.loads(sim_result.strip())
+                    # Clean the response
+                    clean_result = sim_result.strip()
+                    if clean_result.startswith("```json"):
+                        clean_result = clean_result[7:]
+                    if clean_result.startswith("```"):
+                        clean_result = clean_result[3:]
+                    if clean_result.endswith("```"):
+                        clean_result = clean_result[:-3]
+
+                    sim_data = json.loads(clean_result)
 
                     # Validate required fields
                     required_fields = ["repetition_score", "most_repeated_phrases", "suggestions"]
@@ -1277,9 +1292,6 @@ def turnitin_knockoff():
 
                     st.info("Suggestions: " + sim_data["suggestions"])
 
-                except json.JSONDecodeError as e:
-                    st.error(f"Invalid JSON response from AI: {str(e)}")
-                    st.text_area("Raw Similarity Response", value=sim_result, height=200)
                 except Exception as e:
                     st.error(f"Error processing similarity analysis: {str(e)}")
                     st.text_area("Raw Similarity Response", value=sim_result, height=200)
@@ -1315,8 +1327,16 @@ def turnitin_knockoff():
                     raise ValueError("No response received from AI assistant")
 
                 try:
-                    # FIX: Use json.loads() instead of ast.literal_eval()
-                    style_data = json.loads(style_result.strip())
+                    # Clean the response
+                    clean_result = style_result.strip()
+                    if clean_result.startswith("```json"):
+                        clean_result = clean_result[7:]
+                    if clean_result.startswith("```"):
+                        clean_result = clean_result[3:]
+                    if clean_result.endswith("```"):
+                        clean_result = clean_result[:-3]
+
+                    style_data = json.loads(clean_result)
 
                     # Validate required fields
                     required_fields = ["academic_tone_score", "vocabulary_diversity", "potential_issues"]
@@ -1334,9 +1354,6 @@ def turnitin_knockoff():
                                 if isinstance(issue, str):
                                     st.markdown(f"- {issue}")
 
-                except json.JSONDecodeError as e:
-                    st.error(f"Invalid JSON response from AI: {str(e)}")
-                    st.text_area("Raw Style Response", value=style_result, height=200)
                 except Exception as e:
                     st.error(f"Error processing style analysis: {str(e)}")
                     st.text_area("Raw Style Response", value=style_result, height=200)
