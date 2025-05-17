@@ -35,12 +35,25 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 def ai_assistant(prompt, rule):
     try:
-        logging.info("Attempting to configure the Google Generative AI API.")
-        genai.configure(api_key=st.secrets.google.API_KEY)  # Use Streamlit secrets
-        logging.info("Google Generative AI API successfully configured.")
+        # --- SECRETS DEBUGGING ---
+        logging.info("Checking for st.secrets.google.API_KEY...")
+        if "google" not in st.secrets:
+            logging.error("Error: 'google' section not found in st.secrets.")
+            st.error("🚫 Streamlit secrets are not configured correctly. Check your .streamlit/secrets.toml file.")
+            return None
+        if "API_KEY" not in st.secrets.google:
+            logging.error("Error: 'API_KEY' not found in st.secrets.google.")
+            st.error("🚫 API key not found in Streamlit secrets.  Ensure API_KEY is defined under [google].")
+            return None
 
-        model_name = 'models/gemini-2.0-flash'  # Or specify your model
-        logging.info(f"Using model: {model_name}")
+        api_key = st.secrets.google.API_KEY
+        logging.info("API key found in st.secrets.")
+
+        genai.configure(api_key=api_key)
+        logging.info("Google Generative AI API configured successfully.")
+
+        model_name = 'gemini-pro'  # VERIFY THIS MODEL NAME!
+        logging.info(f"Attempting to use model: {model_name}")
         model = genai.GenerativeModel(model_name)
 
         messages = prompt if isinstance(prompt, list) else [
@@ -49,36 +62,33 @@ def ai_assistant(prompt, rule):
         ]
 
         if isinstance(prompt, list):
-            full_prompt = ""
-            for message in messages:
-                if message["role"] == "system":
-                    full_prompt += f" {message['content']} "
-                elif message["role"] == "user":
-                    full_prompt += f" {message['content']} "
-                elif message["role"] == "assistant":
-                    full_prompt += f" {message['content']} "
-            logging.info(f"Full prompt (list): {full_prompt}")  # Log the full prompt
-            response = model.generate_content(full_prompt)
+            full_prompt = " ".join(f"{msg['role']}: {msg['content']}" for msg in messages)  # More robust join
+            logging.info(f"Full prompt (list): {full_prompt}")
         else:
             full_prompt = rule + " " + prompt
             logging.info(f"Full prompt (single): {full_prompt}")
-            response = model.generate_content(full_prompt)
 
-        logging.info("API call successful. Processing response.")
+        logging.info("Sending request to the model...")
+        response = model.generate_content(full_prompt)
 
-        if response.text:
+        logging.info("API call completed.")
+
+        if response and response.text:  # Check for a valid response object
             logging.info("Response text found. Returning.")
             return response.text
         else:
-            logging.warning("🚫  No response text from the model.")
+            logging.warning("🚫  No response or empty response from the model.")
             st.warning("🚫  No response from the model.")
+            if response:
+                logging.warning(f"Full response: {response}")  # Log the entire response for inspection
+            else:
+                logging.warning("Response object is None.")
             return None
 
     except Exception as e:
-        logging.error(f"🚫 An error occurred: {e}", exc_info=True)  # Log with traceback
+        logging.error(f"🚫 An error occurred: {e}", exc_info=True)
         st.error(f"🚫 An error occurred: {e}")
         return None
-
 def main_page():
     st.markdown("""
     <style>
