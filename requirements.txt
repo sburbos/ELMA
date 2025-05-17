@@ -1,9 +1,9 @@
 streamlit
 beautifulsoup4
 python-docx
-openai
 python-pptx
 edge-tts
 PyPDF2
 python-dotenv>=1.0.0
 requests
+google-generativeai
