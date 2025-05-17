@@ -1005,6 +1005,26 @@ def turnitin_knockoff():
     st.title("🔍 Originality Checker")
     st.caption("Academic integrity analysis inspired by Turnitin")
 
+    # Check if the AI assistant is working first
+    def test_ai_assistant():
+        try:
+            test_response = ai_assistant("Test - respond with 'OK'", "You are a test assistant")
+            return test_response == "OK"
+        except Exception as e:
+            st.error(f"AI connection test failed: {str(e)}")
+            return False
+
+    if not test_ai_assistant():
+        st.error("⚠️ The AI assistant is not responding properly. Please check your API connection.")
+        st.info("Try these troubleshooting steps:")
+        st.markdown("""
+        1. Check your internet connection
+        2. Verify your API key is valid
+        3. Ensure you have sufficient API credits
+        4. Try again in a few minutes
+        """)
+        return
+
     # Input options - text or file or URL
     input_method = st.radio("Input Method",
                             ["Text Input", "File Upload", "Website URL"],
@@ -1048,109 +1068,152 @@ def turnitin_knockoff():
 
     if st.button("Run Originality Check"):
         with st.spinner("Analyzing content..."):
+            # First try a simple test query to verify the AI is responding
+            test_result = ai_assistant("Test query - respond with 'READY'", "You are a test assistant")
+            if test_result != "READY":
+                st.error("The AI assistant is not responding properly. Analysis cannot proceed.")
+                return
+
             # AI Detection Analysis
             st.subheader("🤖 AI Detection Score")
             try:
                 ai_prompt = f"""Analyze this text for AI-generated patterns:
                 {text[:analysis_depth]}
 
-                Return a JSON response with:
-                - "score": 0-100 likelihood of AI generation
-                - "flagged_passages": list of suspicious phrases with scores
-                - "explanation": brief rationale
+                Return ONLY a JSON object with these keys:
+                - "score": number between 0-100
+                - "flagged_passages": list of [phrase, score] pairs
+                - "explanation": string explanation
+
+                Example response:
+                {{
+                    "score": 75,
+                    "flagged_passages": [
+                        ["This is a sample phrase", 80],
+                        ["Another example text", 65]
+                    ],
+                    "explanation": "The text shows patterns common in AI-generated content"
+                }}
                 """
 
-                ai_result = ai_assistant(ai_prompt, "You are an AI content detector")
+                ai_result = ai_assistant(ai_prompt, "You are an AI content detector. Return ONLY valid JSON.")
                 if not ai_result:
-                    st.error("AI analysis failed - no response received from the AI assistant")
-                else:
-                    try:
-                        ai_data = ast.literal_eval(ai_result)
-                        if not isinstance(ai_data, dict):
-                            raise ValueError("Response is not a dictionary")
+                    raise ValueError("No response received from AI assistant")
 
-                        st.progress(ai_data.get("score", 0) / 100)
-                        st.metric("AI Likelihood Score", f"{ai_data.get('score', 0)}%")
+                try:
+                    ai_data = ast.literal_eval(ai_result)
+                    if not isinstance(ai_data, dict):
+                        raise ValueError("Response is not a dictionary")
 
-                        # Annotated text display
-                        if "flagged_passages" in ai_data:
-                            annotated_text = text
-                            for passage in ai_data["flagged_passages"]:
-                                if isinstance(passage, (tuple, list)) and len(passage) == 2:
-                                    phrase, score = passage
-                                    if phrase and isinstance(phrase, str) and phrase in annotated_text:
-                                        color = "#ffcccc" if score > 70 else "#ffe6cc" if score > 40 else "#ffffcc"
-                                        annotated_text = annotated_text.replace(
-                                            phrase,
-                                            f'<span style="background-color: {color}">{phrase}</span>'
-                                        )
+                    # Validate required fields
+                    required_fields = ["score", "flagged_passages", "explanation"]
+                    for field in required_fields:
+                        if field not in ai_data:
+                            raise ValueError(f"Missing required field: {field}")
 
-                            with st.expander("Annotated Text (AI Detection)"):
-                                st.markdown(annotated_text, unsafe_allow_html=True)
+                    # Display results
+                    st.progress(ai_data["score"] / 100)
+                    st.metric("AI Likelihood Score", f"{ai_data['score']}%")
 
-                            with st.expander("Detailed AI Analysis"):
-                                for passage in ai_data["flagged_passages"]:
-                                    if isinstance(passage, (tuple, list)) and len(passage) == 2:
-                                        st.markdown(f"- `{passage[0]}` (AI likelihood: {passage[1]}%)")
-                                st.caption(ai_data.get("explanation", "No explanation provided"))
-                    except Exception as e:
-                        st.error(f"Error processing AI analysis: {str(e)}")
-                        st.text_area("Raw AI Response", value=ai_result, height=200)
+                    # Annotated text display
+                    annotated_text = text
+                    for passage in ai_data["flagged_passages"]:
+                        if isinstance(passage, (list, tuple)) and len(passage) == 2:
+                            phrase, score = passage
+                            if isinstance(phrase, str) and phrase in annotated_text:
+                                color = "#ffcccc" if score > 70 else "#ffe6cc" if score > 40 else "#ffffcc"
+                                annotated_text = annotated_text.replace(
+                                    phrase,
+                                    f'<span style="background-color: {color}">{phrase}</span>'
+                                )
+
+                    with st.expander("Annotated Text (AI Detection)"):
+                        st.markdown(annotated_text, unsafe_allow_html=True)
+
+                    with st.expander("Detailed AI Analysis"):
+                        for passage in ai_data["flagged_passages"]:
+                            if isinstance(passage, (list, tuple)) and len(passage) == 2:
+                                st.markdown(f"- `{passage[0]}` (AI likelihood: {passage[1]}%)")
+                        st.caption(ai_data["explanation"])
+
+                except Exception as e:
+                    st.error(f"Error processing AI analysis: {str(e)}")
+                    st.text_area("Raw AI Response", value=ai_result, height=200)
+
             except Exception as e:
-                st.error(f"Failed to generate AI analysis request: {str(e)}")
+                st.error(f"AI Detection analysis failed: {str(e)}")
 
-            # Plagiarism/Similarity Analysis
+            # Plagiarism Analysis
             st.subheader("🔗 External Similarity (Plagiarism Check)")
             try:
                 plag_prompt = f"""Analyze this text for potential plagiarism:
                 {text[:analysis_depth]}
 
-                Return JSON with:
-                - "plagiarism_score": 0-100 likelihood of copied content
-                - "potential_sources": list of dictionaries with "phrase" and "source" keys
-                - "suggestions": for improving originality
+                Return ONLY a JSON object with these keys:
+                - "plagiarism_score": number between 0-100
+                - "potential_sources": list of {{"phrase": string, "source": string}}
+                - "suggestions": string
+
+                Example response:
+                {{
+                    "plagiarism_score": 60,
+                    "potential_sources": [
+                        {{"phrase": "sample text", "source": "example.com"}},
+                        {{"phrase": "another phrase", "source": "sample.org"}}
+                    ],
+                    "suggestions": "Consider rephrasing these passages"
+                }}
                 """
 
-                plag_result = ai_assistant(plag_prompt, "You are a plagiarism detection system")
+                plag_result = ai_assistant(plag_prompt, "You are a plagiarism detector. Return ONLY valid JSON.")
                 if not plag_result:
-                    st.error("Plagiarism analysis failed - no response received from the AI assistant")
-                else:
-                    try:
-                        plag_data = ast.literal_eval(plag_result)
-                        if not isinstance(plag_data, dict):
-                            raise ValueError("Response is not a dictionary")
+                    raise ValueError("No response received from AI assistant")
 
-                        st.progress(plag_data.get("plagiarism_score", 0) / 100)
-                        st.metric("Plagiarism Risk Score", f"{plag_data.get('plagiarism_score', 0)}%")
+                try:
+                    plag_data = ast.literal_eval(plag_result)
+                    if not isinstance(plag_data, dict):
+                        raise ValueError("Response is not a dictionary")
 
-                        # Annotated text for plagiarism
-                        if "potential_sources" in plag_data and isinstance(plag_data["potential_sources"], list):
-                            plag_annotated = text
-                            for item in plag_data["potential_sources"]:
-                                if isinstance(item, dict) and "phrase" in item and "source" in item:
-                                    phrase = item["phrase"]
-                                    source = item["source"]
-                                    if phrase and isinstance(phrase, str) and phrase in plag_annotated:
-                                        plag_annotated = plag_annotated.replace(
-                                            phrase,
-                                            f'<span style="background-color: #ffcccc" title="Possible source: {source}">{phrase}</span>'
-                                        )
+                    # Validate required fields
+                    required_fields = ["plagiarism_score", "potential_sources", "suggestions"]
+                    for field in required_fields:
+                        if field not in plag_data:
+                            raise ValueError(f"Missing required field: {field}")
 
-                            with st.expander("Annotated Text (Plagiarism Check)"):
-                                st.markdown(plag_annotated, unsafe_allow_html=True)
+                    # Display results
+                    st.progress(plag_data["plagiarism_score"] / 100)
+                    st.metric("Plagiarism Risk Score", f"{plag_data['plagiarism_score']}%")
 
-                            with st.expander("Potential Sources"):
-                                for item in plag_data["potential_sources"][:10]:  # Limit to top 10
-                                    if isinstance(item, dict):
-                                        st.markdown(f"- `{item.get('phrase', '')}`")
-                                        st.caption(f"Possible source: {item.get('source', 'unknown')}")
+                    # Annotated text display
+                    if isinstance(plag_data["potential_sources"], list):
+                        plag_annotated = text
+                        for item in plag_data["potential_sources"]:
+                            if isinstance(item, dict) and "phrase" in item and "source" in item:
+                                phrase = item["phrase"]
+                                source = item["source"]
+                                if isinstance(phrase, str) and phrase in plag_annotated:
+                                    plag_annotated = plag_annotated.replace(
+                                        phrase,
+                                        f'<span style="background-color: #ffcccc" title="Possible source: {source}">{phrase}</span>'
+                                    )
 
-                        st.info("Suggestions: " + plag_data.get("suggestions", "No suggestions provided"))
-                    except Exception as e:
-                        st.error(f"Error processing plagiarism analysis: {str(e)}")
-                        st.text_area("Raw Plagiarism Response", value=plag_result, height=200)
+                        with st.expander("Annotated Text (Plagiarism Check)"):
+                            st.markdown(plag_annotated, unsafe_allow_html=True)
+
+                        with st.expander("Potential Sources"):
+                            for item in plag_data["potential_sources"][:10]:
+                                if isinstance(item, dict):
+                                    st.markdown(f"- `{item.get('phrase', '')}`")
+                                    st.caption(f"Possible source: {item.get('source', 'unknown')}")
+
+                    st.info("Suggestions: " + plag_data["suggestions"])
+
+                except Exception as e:
+                    st.error(f"Error processing plagiarism analysis: {str(e)}")
+                    st.text_area("Raw Plagiarism Response", value=plag_result, height=200)
+
             except Exception as e:
-                st.error(f"Failed to generate plagiarism analysis request: {str(e)}")
+                st.error(f"Plagiarism analysis failed: {str(e)}")
 
             # Self-Similarity Analysis
             st.subheader("📝 Internal Similarity")
@@ -1158,41 +1221,60 @@ def turnitin_knockoff():
                 sim_prompt = f"""Analyze this document's self-similarity:
                 {text[:analysis_depth]}
 
-                Return JSON with:
-                - "repetition_score": 0-100
-                - "most_repeated_phrases": list of dictionaries with "phrase" and "count" keys
-                - "suggestions": for improving originality
+                Return ONLY a JSON object with these keys:
+                - "repetition_score": number between 0-100
+                - "most_repeated_phrases": list of {{"phrase": string, "count": number}}
+                - "suggestions": string
+
+                Example response:
+                {{
+                    "repetition_score": 45,
+                    "most_repeated_phrases": [
+                        {{"phrase": "common phrase", "count": 5}},
+                        {{"phrase": "another phrase", "count": 3}}
+                    ],
+                    "suggestions": "Try varying your word choice"
+                }}
                 """
 
-                sim_result = ai_assistant(sim_prompt, "You are a plagiarism detection system")
+                sim_result = ai_assistant(sim_prompt, "You analyze text repetition. Return ONLY valid JSON.")
                 if not sim_result:
-                    st.error("Similarity analysis failed - no response received from the AI assistant")
-                else:
-                    try:
-                        sim_data = ast.literal_eval(sim_result)
-                        if not isinstance(sim_data, dict):
-                            raise ValueError("Response is not a dictionary")
+                    raise ValueError("No response received from AI assistant")
 
-                        st.progress(sim_data.get("repetition_score", 0) / 100)
+                try:
+                    sim_data = ast.literal_eval(sim_result)
+                    if not isinstance(sim_data, dict):
+                        raise ValueError("Response is not a dictionary")
 
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.metric("Repetition Score", f"{sim_data.get('repetition_score', 0)}%")
-                        with col2:
-                            st.metric("Unique Phrases", f"{100 - sim_data.get('repetition_score', 0)}%")
+                    # Validate required fields
+                    required_fields = ["repetition_score", "most_repeated_phrases", "suggestions"]
+                    for field in required_fields:
+                        if field not in sim_data:
+                            raise ValueError(f"Missing required field: {field}")
 
-                        if "most_repeated_phrases" in sim_data and isinstance(sim_data["most_repeated_phrases"], list):
-                            with st.expander("Top Repeated Phrases"):
-                                for item in sim_data["most_repeated_phrases"][:5]:
-                                    if isinstance(item, dict):
-                                        st.code(f"{item.get('phrase', '')} (repeated {item.get('count', 0)}x)")
+                    # Display results
+                    st.progress(sim_data["repetition_score"] / 100)
 
-                        st.info("Suggestions: " + sim_data.get("suggestions", "No suggestions provided"))
-                    except Exception as e:
-                        st.error(f"Error processing similarity analysis: {str(e)}")
-                        st.text_area("Raw Similarity Response", value=sim_result, height=200)
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("Repetition Score", f"{sim_data['repetition_score']}%")
+                    with col2:
+                        st.metric("Unique Phrases", f"{100 - sim_data['repetition_score']}%")
+
+                    if isinstance(sim_data["most_repeated_phrases"], list):
+                        with st.expander("Top Repeated Phrases"):
+                            for item in sim_data["most_repeated_phrases"][:5]:
+                                if isinstance(item, dict):
+                                    st.code(f"{item.get('phrase', '')} (repeated {item.get('count', 0)}x)")
+
+                    st.info("Suggestions: " + sim_data["suggestions"])
+
+                except Exception as e:
+                    st.error(f"Error processing similarity analysis: {str(e)}")
+                    st.text_area("Raw Similarity Response", value=sim_result, height=200)
+
             except Exception as e:
-                st.error(f"Failed to generate similarity analysis request: {str(e)}")
+                st.error(f"Similarity analysis failed: {str(e)}")
 
             # Writing Style Analysis
             st.subheader("✍️ Writing Style")
@@ -1200,34 +1282,53 @@ def turnitin_knockoff():
                 style_prompt = f"""Analyze this text's writing style:
                 {text[:3000]}
 
-                Return JSON with:
-                - "academic_tone_score": 0-100
-                - "vocabulary_diversity": 0-100
-                - "potential_issues": list
+                Return ONLY a JSON object with these keys:
+                - "academic_tone_score": number between 0-100
+                - "vocabulary_diversity": number between 0-100
+                - "potential_issues": list of strings
+
+                Example response:
+                {{
+                    "academic_tone_score": 80,
+                    "vocabulary_diversity": 65,
+                    "potential_issues": [
+                        "Overuse of passive voice",
+                        "Limited sentence variety"
+                    ]
+                }}
                 """
 
-                style_result = ai_assistant(style_prompt, "You are a writing style analyzer")
+                style_result = ai_assistant(style_prompt, "You analyze writing style. Return ONLY valid JSON.")
                 if not style_result:
-                    st.error("Style analysis failed - no response received from the AI assistant")
-                else:
-                    try:
-                        style_data = ast.literal_eval(style_result)
-                        if not isinstance(style_data, dict):
-                            raise ValueError("Response is not a dictionary")
+                    raise ValueError("No response received from AI assistant")
 
-                        st.metric("Academic Tone", f"{style_data.get('academic_tone_score', 0)}%")
-                        st.metric("Vocabulary Diversity", f"{style_data.get('vocabulary_diversity', 0)}%")
+                try:
+                    style_data = ast.literal_eval(style_result)
+                    if not isinstance(style_data, dict):
+                        raise ValueError("Response is not a dictionary")
 
-                        if "potential_issues" in style_data and isinstance(style_data["potential_issues"], list):
-                            with st.expander("Style Suggestions"):
-                                for issue in style_data["potential_issues"]:
-                                    if isinstance(issue, str):
-                                        st.markdown(f"- {issue}")
-                    except Exception as e:
-                        st.error(f"Error processing style analysis: {str(e)}")
-                        st.text_area("Raw Style Response", value=style_result, height=200)
+                    # Validate required fields
+                    required_fields = ["academic_tone_score", "vocabulary_diversity", "potential_issues"]
+                    for field in required_fields:
+                        if field not in style_data:
+                            raise ValueError(f"Missing required field: {field}")
+
+                    # Display results
+                    st.metric("Academic Tone", f"{style_data['academic_tone_score']}%")
+                    st.metric("Vocabulary Diversity", f"{style_data['vocabulary_diversity']}%")
+
+                    if isinstance(style_data["potential_issues"], list):
+                        with st.expander("Style Suggestions"):
+                            for issue in style_data["potential_issues"]:
+                                if isinstance(issue, str):
+                                    st.markdown(f"- {issue}")
+
+                except Exception as e:
+                    st.error(f"Error processing style analysis: {str(e)}")
+                    st.text_area("Raw Style Response", value=style_result, height=200)
+
             except Exception as e:
-                st.error(f"Failed to generate style analysis request: {str(e)}")
+                st.error(f"Style analysis failed: {str(e)}")
 
 # from bs4 import BeautifulSoup
 # from docx import Document
