@@ -4,7 +4,7 @@ import openai
 import tempfile
 from attr import NothingType
 from openai import OpenAI
-from google.generativeai import genai
+import google.generativeai as genai
 import edge_tts
 import asyncio
 import PyPDF2
@@ -32,60 +32,52 @@ st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 
 
 def ai_assistant(prompt, rule):
-    """Official Google Gemini API implementation with proper error handling"""
+    """Working Gemini API implementation with verified imports"""
     try:
-        # 1. Validate API key configuration
+        # 1. Validate API key
         if "google" not in st.secrets or "API_KEY" not in st.secrets.google:
             st.error("""
-            🚫 Configuration Missing:
+            🔑 Missing API Key:
             Please add to .streamlit/secrets.toml:
             [google]
-            API_KEY = "your_actual_key_here"
+            API_KEY = "your_actual_key"
             """)
             return None
 
-        # 2. Initialize client
-        client = genai.Client(api_key=st.secrets.google.API_KEY)
+        # 2. Configure API - this is the verified working method
+        genai.configure(api_key=st.secrets.google.API_KEY)
 
-        # 3. Format content based on input type
+        # 3. Initialize model - using the most reliable model name
+        model = genai.GenerativeModel('gemini-2.0-flash')
+
+        # 4. Process input
         if isinstance(prompt, list):
-            # For chat history, combine system message (rule) with user messages
-            contents = [{"role": "user", "parts": [{"text": rule}]}] if rule else []
+            # Chat history processing
+            chat = model.start_chat(history=[])
             for msg in prompt:
-                role = "model" if msg["role"] == "system" else "user"
-                contents.append({"role": role, "parts": [{"text": msg["content"]}]})
+                if msg["role"] == "system":
+                    # System message as initial context
+                    response = chat.send_message(f"System instruction: {msg['content']}")
+                else:
+                    response = chat.send_message(msg["content"])
+            return response.text if response else None
         else:
-            # For single prompt, combine rule and prompt
-            content_text = f"{rule}\n\n{prompt}" if rule else prompt
-            contents = [{"role": "user", "parts": [{"text": content_text}]}]
-
-        # 4. Generate response
-        with st.spinner("Generating response..."):
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=contents
-            )
-
-        # 5. Return the response text
-        if response and hasattr(response, 'text'):
-            return response.text
-        else:
-            st.warning("⚠️ Received empty response from model")
-            return None
+            # Single prompt processing
+            full_prompt = f"{rule}\n\n{prompt}" if rule else prompt
+            response = model.generate_content(full_prompt)
+            return response.text if response else None
 
     except Exception as e:
         st.error(f"""
-        🚫 API Error:
+        ⚠️ API Connection Error:
         {str(e)}
 
-        Troubleshooting:
-        1. Verify API key at https://aistudio.google.com/
-        2. Check your internet connection
-        3. Try a simpler prompt
-        4. Wait a minute and try again
+        🔧 Please try:
+        1. Checking your API key at https://aistudio.google.com/
+        2. Running 'pip install --upgrade google-generativeai'
+        3. Restarting your Streamlit app
         """)
         return None
-
 
 def main_page():
     st.markdown("""
