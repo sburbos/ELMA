@@ -2,6 +2,7 @@
 import streamlit as st
 import tempfile
 from attr import NothingType
+from openai import OpenAI
 import edge_tts
 import asyncio
 import PyPDF2
@@ -14,7 +15,6 @@ import numpy as np
 from difflib import SequenceMatcher
 import os
 import requests
-import google.generativeai as genai
 
 # Initialize the OpenAI client with proper configuration
 
@@ -29,47 +29,115 @@ st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 #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
 import requests
 
-# Configure basic logging (you can customize this)
-def ai_assistant(prompt, rule=None):
+
+def ai_assistant(prompt, rule):
+    """Enhanced AI assistant function for Google Gemini API with multiple fallback keys"""
     try:
-        # --- API Configuration ---
-        if "google" not in st.secrets or "API_KEY" not in st.secrets.google:
-            st.error("🚫 Google API key not found in Streamlit secrets. Please check your secrets.toml file.")
+        # Validate API keys
+        if "openrouter" not in st.secrets or "API_KEYS" not in st.secrets.openrouter:
+            st.error("🚫 API keys not found in Streamlit secrets")
             return None
 
-        api_key = st.secrets.google.API_KEY
+        keys = st.secrets.openrouter.API_KEYS
+        if not isinstance(keys, list) or len(keys) == 0:
+            st.error("🚫 No valid API keys provided")
+            return None
 
-        # Configure the Gemini client
-        genai.configure(api_key=api_key)
+        # Gemini API endpoint
+        base_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
 
-        # Initialize the model - using Gemini Flash for speed
-        model = genai.GenerativeModel('gemini-2.0-flash')
-
-        # Format the prompt based on input type
+        # Prepare messages based on input type
         if isinstance(prompt, list):
-            # For chat history, convert to Gemini's format
-            messages = []
+            # Convert chat history to Gemini format
+            contents = []
             for msg in prompt:
                 if msg["role"] == "system":
-                    messages.append({"role": "model", "parts": [msg["content"]]})
+                    contents.append({"role": "model", "parts": [{"text": msg["content"]}]})
                 else:
-                    messages.append({"role": "user", "parts": [msg["content"]]})
-            response = model.generate_content(messages)
+                    contents.append({"role": "user", "parts": [{"text": msg["content"]}]})
         else:
-            # For single prompts, combine with rule if provided
-            full_prompt = f"{rule}\n\n{prompt}" if rule else prompt
-            response = model.generate_content(full_prompt)
+            # Single prompt with system instruction
+            contents = [{
+                "role": "user",
+                "parts": [{"text": f"{rule}\n\n{prompt}"}]
+            }]
 
-        # Return the text response
-        if response and response.text:
-            return response.text
-        else:
-            st.warning("🚫 No response from the model")
-            return None
+        # Request configuration
+        data = {
+            "contents": contents,
+            "generationConfig": {
+                "maxOutputTokens": 2048,
+                "temperature": 0.7,
+                "topK": 40,
+                "topP": 0.95
+            },
+            "safetySettings": [
+                {
+                    "category": "HARM_CATEGORY_HARASSMENT",
+                    "threshold": "BLOCK_ONLY_HIGH"
+                },
+                {
+                    "category": "HARM_CATEGORY_HATE_SPEECH",
+                    "threshold": "BLOCK_ONLY_HIGH"
+                }
+            ]
+        }
+
+        # Try each key until success
+        for key in keys:
+            try:
+                headers = {
+                    "Authorization": f"Bearer {key}",
+                    "Content-Type": "application/json",
+                    "X-Referer": "https://lley-ai.streamlit.app/",
+                    "X-Title": "LleY Ai"
+                }
+
+                with st.spinner("Generating response..."):
+                    response = requests.post(
+                        base_url,
+                        headers=headers,
+                        json=data,
+                        timeout=30  # 30-second timeout
+                    )
+
+                # Process successful response
+                if response.status_code == 200:
+                    try:
+                        return response.json()["candidates"][0]["content"]["parts"][0]["text"]
+                    except (KeyError, IndexError) as e:
+                        st.warning(f"⚠️ Unexpected response format from key ...{key[-4:]}")
+                        continue
+
+                # Handle rate limits
+                elif response.status_code == 429:
+                    st.warning(f"⚠️ API key ending in ...{key[-4:]} rate limited. Trying next...")
+                    continue
+
+                # Handle other HTTP errors
+                else:
+                    error_msg = response.json().get("error", {}).get("message", "Unknown error")
+                    st.warning(f"⚠️ Key ...{key[-4:]} failed (HTTP {response.status_code}): {error_msg}")
+                    continue
+
+            except requests.exceptions.Timeout:
+                st.warning(f"⚠️ Timeout with key ...{key[-4:]}. Trying next...")
+                continue
+            except requests.exceptions.RequestException as e:
+                st.warning(f"⚠️ Network error with key ...{key[-4:]}: {str(e)}")
+                continue
+            except Exception as e:
+                st.warning(f"⚠️ Unexpected error with key ...{key[-4:]}: {str(e)}")
+                continue
+
+        st.error("🚫 All API keys failed. Please try again later or check your API keys.")
+        return None
 
     except Exception as e:
-        st.error(f"🚫 An error occurred: {str(e)}")
+        st.error(f"🚫 Critical error in AI assistant: {str(e)}")
         return None
+
+
 def main_page():
     st.markdown("""
     <style>
