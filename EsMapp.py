@@ -677,7 +677,7 @@ def pdf2quiz():
             reader = PyPDF2.PdfReader(pdf_file)
             pdf_text = []
             for page in reader.pages:
-                content = page.extract_text()
+                content = page.extracft_text()
                 if content:  # Only add if text was extracted
                     pdf_text.append(content)
             return "\n".join(pdf_text) if pdf_text else "No text could be extracted from the PDF."
@@ -754,7 +754,7 @@ def pdf2quiz():
     st.subheader("Upload PDF or PPTX to generate a quiz")
 
     # Quiz type selection
-    quiz_type = st.segmented_control(
+    quiz_type = st.radio(
         "Quiz Type",
         options=["Multiple Choice", "Open-Ended (Definition/Enumeration/Essay)"],
         key="quiz_type_selector"
