@@ -1,9 +1,9 @@
 #google api key AIzaSyAI_nzXk4dW-VUxG7T23uB_Tm9WXT3ZQ1M
 import streamlit as st
+import openai 
 import tempfile
 from attr import NothingType
 from openai import OpenAI
-import google.generativeai as genai
 import edge_tts
 import asyncio
 import PyPDF2
@@ -16,7 +16,7 @@ import numpy as np
 from difflib import SequenceMatcher
 import os
 import requests
-from google.api_core import retry
+
 # Initialize the OpenAI client with proper configuration
 
 st.set_page_config(
@@ -30,89 +30,45 @@ st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 #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
 
 
-
 def ai_assistant(prompt, rule):
-    """Enhanced Gemini AI assistant with robust error handling and configuration"""
+    """AI Assistant using Google Gemini API with OpenAI-compatible client"""
     try:
-        # 1. Validate and configure API
+        # Validate API key
         if "google" not in st.secrets or "API_KEY" not in st.secrets.google:
-            st.error("""
-            🚫 Configuration Missing:
-            Please add your Google API key to .streamlit/secrets.toml as:
-            [google]
-            API_KEY = "your_actual_api_key"
-            """)
+            st.error("🚫 Google API key not found in Streamlit secrets")
             return None
 
-        genai.configure(api_key=st.secrets.google.API_KEY)
-
-        # 2. Model configuration with safety settings
-        generation_config = {
-            "temperature": 0.7,
-            "top_p": 0.9,
-            "top_k": 40,
-            "max_output_tokens": 2048,
-        }
-
-        safety_settings = [
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
-            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_ONLY_HIGH"},
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
-        ]
-
-        model = genai.GenerativeModel(
-            'gemini-2.0-flash',
-            generation_config=generation_config,
-            safety_settings=safety_settings
+        # Initialize client with Google's endpoint
+        client = OpenAI(
+            api_key=st.secrets.google.API_KEY,
+            base_url="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
         )
 
-        # 3. Process input based on type
-        @retry.Retry()
-        def generate_response():
-            if isinstance(prompt, list):  # Chat history
-                history = []
-                for msg in prompt:
-                    role = "model" if msg["role"] == "system" else "user"
-                    history.append({"role": role, "parts": [{"text": msg["content"]}]})
+        # Format messages
+        messages = prompt if isinstance(prompt, list) else [
+            {"role": "system", "content": rule},
+            {"role": "user", "content": prompt}
+        ]
 
-                chat = model.start_chat(history=history)
-                return chat.send_message(rule or "Respond to the user")
-            else:  # Single prompt
-                full_prompt = f"{rule}\n\n{prompt}" if rule else prompt
-                return model.generate_content(full_prompt)
+        # Make the API call
+        response = client.chat.completions.create(
+            model="gemini-2.0-flash",
+            messages=messages,
+            max_tokens=2048,
+            temperature=0.7
+        )
 
-        # 4. Get and validate response
-        with st.spinner("Generating response..."):
-            response = generate_response()
+        # Return the response
+        if response and response.choices:
+            return response.choices[0].message.content
+        else:
+            st.warning("🚫 No response from the model")
+            return None
 
-            if not response:
-                st.warning("⚠️ Received empty response from model")
-                return None
-
-            if hasattr(response, 'text'):  # Newer response format
-                return response.text
-            elif hasattr(response, 'candidates'):  # Legacy format
-                return response.candidates[0].content.parts[0].text
-            else:
-                st.error("⚠️ Unexpected response format from API")
-                return None
-
-    except genai.types.BlockedPromptError as e:
-        st.error(f"🚫 Content blocked by safety filters: {str(e)}")
-        return None
     except Exception as e:
-        st.error(f"""
-        🚫 API Error:
-        {str(e)}
-
-        Troubleshooting:
-        1. Verify API key is valid and has quota
-        2. Check your internet connection
-        3. Try a simpler prompt
-        4. Wait a minute and try again
-        """)
+        st.error(f"🚫 An error occurred: {str(e)}")
         return None
+
 
 
 def main_page():
@@ -1366,7 +1322,6 @@ def turnitin_knockoff():
                 - "potential_issues": list of strings
                 - make sure that the analysis is based from the whole text and not focusing in a single sentence or phrases to prevent false positives or systematic errors in calculating.
                 total score must be based on the overall text given.
-                
                 Example response:
                 {{
                     "academic_tone_score": 80,
