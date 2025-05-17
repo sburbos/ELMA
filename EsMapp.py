@@ -31,32 +31,28 @@ st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 #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
 
 
-def ai_assistant(prompt, extra):
-    """Simple Gemini API implementation that returns response or None"""
-    final = extra + prompt
+def ai_assistant(prompt, rule):
+    """OpenAI-compatible wrapper for Gemini 2.0 Flash"""
     try:
-        # Configure API - using direct key (replace with your actual key)
-        genai.configure(api_key="AIzaSyC5Vn0GQEbvGKRvPkwm42i0ZZYt0ChK-Xs")
+        client = OpenAI(
+            api_key="AIzaSyC5Vn0GQEbvGKRvPkwm42i0ZZYt0ChK-Xs",  # Replace with your actual key
+            base_url="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+        )
 
-        # Initialize model with current recommended version
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = client.chat.completions.create(
+            model="gemini-2.0-flash",
+            messages=[
+                {"role": "system", "content": rule},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=2048
+        )
 
-        # Handle single string prompt
-        if isinstance(final, str):
-            response = model.generate_content(final)
-            return response.text if hasattr(response, 'text') else None
-
-        # Handle chat history (list of messages)
-        elif isinstance(final, list):
-            chat = model.start_chat(history=[])
-            response = None
-            for msg in prompt:
-                if msg.get("role") == "user":
-                    response = chat.send_message(msg.get("content", ""))
-            return response.text if response and hasattr(response, 'text') else None
+        return response.choices[0].message.content
 
     except Exception as e:
-        print(f"API Error: {str(e)}")  # Basic error logging
+        st.error(f"API Error: {str(e)}")
         return None
 
 def main_page():
@@ -650,7 +646,7 @@ def aito():
         st.chat_message("user").write(prompt)
 
         # Get AI response with full conversation history
-        response = ai_assistant(st.session_state.messages, extra = "")
+        response = ai_assistant(st.session_state.messages, rule=None)
 
         if response:
             # Add AI response to chat history
@@ -990,7 +986,7 @@ def turnitin_knockoff():
     st.caption("Academic integrity analysis inspired by Turnitin")
 
     # Check if the AI assistant is working first
-
+    
     # Input options - text or file or URL
     input_method = st.radio("Input Method",
                             ["Text Input", "File Upload", "Website URL"],
@@ -1035,7 +1031,7 @@ def turnitin_knockoff():
     if st.button("Run Originality Check"):
         with st.spinner("Analyzing content..."):
             # First try a simple test query to verify the AI is responding
-            test_result = ai_assistant("Test query - respond with 'READY'", extra = "")
+            test_result = ai_assistant("Test query - respond with 'READY'", "You are a test assistant")
             if test_result != "READY":
                 st.error("The AI assistant is not responding properly. Analysis cannot proceed.")
                 return
@@ -1063,7 +1059,7 @@ def turnitin_knockoff():
                 }}
                 """
 
-                ai_result = ai_assistant(ai_prompt, extra = "")
+                ai_result = ai_assistant(ai_prompt, "You are an AI content detector. Return ONLY valid JSON.")
                 if not ai_result:
                     raise ValueError("No response received from AI assistant")
 
@@ -1144,7 +1140,7 @@ def turnitin_knockoff():
                 }}
                 """
 
-                plag_result = ai_assistant(plag_prompt, extra = "")
+                plag_result = ai_assistant(plag_prompt, "You are a plagiarism detector. Return ONLY valid JSON.")
                 if not plag_result:
                     raise ValueError("No response received from AI assistant")
 
@@ -1241,7 +1237,7 @@ def turnitin_knockoff():
                 }}
                 """
 
-                sim_result = ai_assistant(sim_prompt, extra = "")
+                sim_result = ai_assistant(sim_prompt, "You analyze text repetition. Return ONLY valid JSON.")
                 if not sim_result:
                     raise ValueError("No response received from AI assistant")
 
@@ -1303,7 +1299,7 @@ def turnitin_knockoff():
                 }}
                 """
 
-                style_result = ai_assistant(style_prompt, extra = "")
+                style_result = ai_assistant(style_prompt, "You analyze writing style. Return ONLY valid JSON.")
                 if not style_result:
                     raise ValueError("No response received from AI assistant")
 
