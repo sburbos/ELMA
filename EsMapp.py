@@ -68,7 +68,7 @@ def ai_assistant(prompt, rule):
                     "content": prompt
                 }
             ],
-            max_tokens=30000  # Added to prevent timeouts
+            max_tokens=90000  # Added to prevent timeouts
         )
         return response.choices[0].message.content
     except Exception as det:
