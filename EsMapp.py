@@ -52,7 +52,7 @@ def ai_assistant(prompt, rule):
         genai.configure(api_key=api_key)
         logging.info("Google Generative AI API configured successfully.")
 
-        model_name = 'gemini-pro'  # VERIFY THIS MODEL NAME!
+        model_name = "models/gemini-2.0-flash"  # VERIFY THIS MODEL NAME!
         logging.info(f"Attempting to use model: {model_name}")
         model = genai.GenerativeModel(model_name)
 
