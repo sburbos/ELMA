@@ -4,7 +4,7 @@ import openai
 import tempfile
 from attr import NothingType
 from openai import OpenAI
-import google.generativeai as genai
+from google import genai
 import edge_tts
 import asyncio
 import PyPDF2
@@ -32,83 +32,57 @@ st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
 
 
 def ai_assistant(prompt, rule):
-    """Proper Google Gemini API implementation with correct endpoint"""
+    """Official Google Gemini API implementation with proper error handling"""
     try:
         # 1. Validate API key configuration
         if "google" not in st.secrets or "API_KEY" not in st.secrets.google:
             st.error("""
             🚫 Configuration Missing:
-            Please add your Google API key to .streamlit/secrets.toml as:
+            Please add to .streamlit/secrets.toml:
             [google]
-            API_KEY = "your_actual_api_key"
+            API_KEY = "your_actual_key_here"
             """)
             return None
 
-        # 2. Configure the API with the correct endpoint
-        genai.configure(
-            api_key=st.secrets.google.API_KEY,
-            transport='rest',  # Ensures we use proper REST endpoints
-            client_options={
-                'api_endpoint': 'https://generativelanguage.googleapis.com/v1beta/models'
-            }
-        )
+        # 2. Initialize client
+        client = genai.Client(api_key=st.secrets.google.API_KEY)
 
-        # 3. Initialize the model with proper configuration
-        generation_config = {
-            "temperature": 0.7,
-            "top_p": 1.0,
-            "top_k": 40,
-            "max_output_tokens": 2048,
-        }
-
-        safety_settings = [
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
-            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_ONLY_HIGH"},
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
-        ]
-
-        model = genai.GenerativeModel(
-            'gemini-2.0-flash',  # Using the latest flash model
-            generation_config=generation_config,
-            safety_settings=safety_settings
-        )
-
-        # 4. Process the input and generate response
-        if isinstance(prompt, list):  # Chat history
-            # Convert to Gemini's expected format
-            history = []
+        # 3. Format content based on input type
+        if isinstance(prompt, list):
+            # For chat history, combine system message (rule) with user messages
+            contents = [{"role": "user", "parts": [{"text": rule}]}] if rule else []
             for msg in prompt:
                 role = "model" if msg["role"] == "system" else "user"
-                history.append({"role": role, "parts": [{"text": msg["content"]}]})
+                contents.append({"role": role, "parts": [{"text": msg["content"]}]})
+        else:
+            # For single prompt, combine rule and prompt
+            content_text = f"{rule}\n\n{prompt}" if rule else prompt
+            contents = [{"role": "user", "parts": [{"text": content_text}]}]
 
-            # Start chat session
-            chat = model.start_chat(history=history)
-            response = chat.send_message(rule or "Respond to the user")
-        else:  # Single prompt
-            full_prompt = f"{rule}\n\n{prompt}" if rule else prompt
-            response = model.generate_content(full_prompt)
+        # 4. Generate response
+        with st.spinner("Generating response..."):
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=contents
+            )
 
-        # 5. Return the response
-        if response and response.text:
+        # 5. Return the response text
+        if response and hasattr(response, 'text'):
             return response.text
         else:
-            st.warning("🚫 No response from the model")
+            st.warning("⚠️ Received empty response from model")
             return None
 
-    except genai.types.BlockedPromptError as e:
-        st.error(f"🚫 Content blocked by safety filters: {str(e)}")
-        return None
     except Exception as e:
         st.error(f"""
         🚫 API Error:
         {str(e)}
 
         Troubleshooting:
-        1. Verify your API key is valid at https://aistudio.google.com/
-        2. Ensure you have quota for the Gemini API
-        3. Check your internet connection
-        4. Try again in a few minutes
+        1. Verify API key at https://aistudio.google.com/
+        2. Check your internet connection
+        3. Try a simpler prompt
+        4. Wait a minute and try again
         """)
         return None
 
