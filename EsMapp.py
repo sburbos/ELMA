@@ -890,33 +890,38 @@ def pdf2quiz():
                     correct_answer = question[question['answer_key']]
                     if st.session_state.quiz['answers'][q_num] == correct_answer:
                         st.success("✓ Correct!")
+
+                    elif q_num in st.session_state.quiz.get('scores', {}):
+                        score_data = st.session_state.quiz['scores'][q_num]
+
+                        # Display score
+                        st.markdown(f"**Score:** {score_data['score']}/10")
+
+                        # Display expandable explanation
+                        with st.expander("🔍 View Explanation", expanded=False):
+                            st.write(score_data.get('explanation', 'No explanation available'))
+                            if 'key_matches' in score_data:
+                                st.markdown("**✅ Correct Elements:**")
+                                for item in score_data['key_matches']:
+                                    st.markdown(f"- {item}")
+                            if 'missing_points' in score_data:
+                                st.markdown("**🔍 Missing Elements:**")
+                                for item in score_data['missing_points']:
+                                    st.markdown(f"- {item}")
+
+                        # Display expandable suggestions
+                        with st.expander("💡 View Suggestions", expanded=False):
+                            st.write(score_data.get('feedback', 'No suggestions available'))
+
+                        # Display expandable model answer
+                        with st.expander("📚 View Model Answer", expanded=False):
+                            st.markdown("**Scoring Criteria:**")
+                            for criterion in question.get('scoring_criteria', []):
+                                st.markdown(f"- {criterion}")
+                            st.markdown("**Model Answer:**")
+                            st.success(question.get('model_answer', 'Not available'))
                     else:
                         st.error(f"✗ Incorrect. The correct answer is: {correct_answer}")
-                elif q_num in st.session_state.quiz.get('scores', {}):
-                    score_data = st.session_state.quiz['scores'][q_num]
-
-                    st.markdown(f"**Score:** {score_data['score']}/10")
-
-                    with st.expander("📝 Detailed Explanation", expanded=False):
-                        st.write(score_data.get('explanation', 'No explanation available'))
-                        if 'key_matches' in score_data:
-                            st.markdown("**✅ Correct Elements:**")
-                            for item in score_data['key_matches']:
-                                st.markdown(f"- {item}")
-                        if 'missing_points' in score_data:
-                            st.markdown("**🔍 Missing Elements:**")
-                            for item in score_data['missing_points']:
-                                st.markdown(f"- {item}")
-
-                    with st.expander("💡 Improvement Suggestions", expanded=False):
-                        st.write(score_data.get('feedback', 'No suggestions available'))
-
-                    with st.expander("📚 Model Answer", expanded=False):
-                        st.markdown("**Scoring Criteria:**")
-                        for i, criterion in enumerate(question.get('scoring_criteria', []), 1):
-                            st.markdown(f"{i}. {criterion}")
-                        st.markdown("**Ideal Answer:**")
-                        st.success(question.get('model_answer', 'Not available'))
 
             st.markdown("---")
 
