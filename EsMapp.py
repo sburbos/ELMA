@@ -994,40 +994,77 @@ def pdf2quiz():
                             for q_num, question in st.session_state.quiz['data'].items():
                                 user_answer = st.session_state.quiz['answers'][q_num]
 
-                                # Add this validation check first
-                                if not user_answer or len(user_answer.strip()) < 5:
+                                # Validate answer exists
+                                if not user_answer or len(user_answer.strip()) < 3:
                                     scores[q_num] = {
                                         "score": 1,
-                                        "explanation": "Answer was too short or empty",
-                                        "feedback": "Please provide a more detailed response"
+                                        "explanation": "Answer too short",
+                                        "feedback": "Please provide a more detailed answer"
                                     }
                                     continue
 
+                                # Prepare scoring data
                                 criteria = "\n".join([f"- {c}" for c in question.get('scoring_criteria', [])])
+                                model_answer = question.get('model_answer', 'No model answer provided')
 
                                 prompt = f"""
-                                Question: {question['question']}
-                                Model Answer: {question.get('model_answer', 'No model answer provided')}
-                                Scoring Criteria:
+                                **Grading Instructions**:
+                                1. Compare the student's answer to the model answer
+                                2. Check against these scoring criteria:
                                 {criteria}
-                                Student Answer: {user_answer}
+                                3. Score from 1-10 based on:
+                                   - Keyword matches (1 point per key term)
+                                   - Conceptual accuracy (1-3 points)
+                                   - Completeness (1-3 points)
+                                   - Clarity (1-3 points)
+                                4. Minimum 4 points if answer shows any understanding
 
-                                Evaluate the student's answer based on the above information.
-                                Return ONLY a Python dictionary with this format:
+                                **Question**: {question['question']}
+                                **Model Answer**: {model_answer}
+                                **Student Answer**: {user_answer}
+
+                                Return ONLY this format (NO additional text):
                                 {{
-                                    "score": x (between 1-10),
-                                    "explanation": "Brief explanation of the score",
-                                    "feedback": "Specific suggestions for improvement"
+                                    "score": [1-10],
+                                    "explanation": "Brief justification",
+                                    "feedback": "Specific improvements"
                                 }}
                                 """
+
                                 score_data = ai_assistant(prompt, scoring_system)
+
+                                # Improved response parsing with better error handling
                                 try:
-                                    scores[q_num] = ast.literal_eval(score_data.strip())
+                                    # First clean the response
+                                    clean_data = score_data.strip()
+
+                                    # Remove markdown code blocks if present
+                                    if clean_data.startswith("```"):
+                                        clean_data = clean_data.split("```")[1]
+                                        if clean_data.startswith("python") or clean_data.startswith("json"):
+                                            clean_data = clean_data[6:].strip()
+
+                                    # Remove any remaining whitespace or quotes
+                                    clean_data = clean_data.strip().strip('"').strip("'")
+
+                                    # Parse the JSON
+                                    score_dict = json.loads(clean_data)
+
+                                    # Validate required fields
+                                    if not all(key in score_dict for key in ["score", "explanation", "feedback"]):
+                                        raise ValueError("Missing required fields")
+
+                                    # Ensure score is within bounds
+                                    score_dict["score"] = max(1, min(10, int(score_dict["score"])))
+
+                                    scores[q_num] = score_dict
+
                                 except Exception as e:
+                                    # Fallback scoring if parsing fails
                                     scores[q_num] = {
-                                        "score": 4,  # Default to 4 for reasonable attempts
-                                        "explanation": "Your answer shows some understanding of the topic",
-                                        "feedback": "Try to expand on your answer with more specific details from the material"
+                                        "score": min(7, max(4, len(user_answer.split()) // 3)),  # Length-based score
+                                        "explanation": "Automated scoring applied",
+                                        "feedback": "The system had difficulty evaluating this exact answer"
                                     }
 
                             st.session_state.quiz['scores'] = scores
