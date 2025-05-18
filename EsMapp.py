@@ -746,11 +746,12 @@ def pdf2quiz():
                         1. If the answer shows any reasonable understanding of the topic, give at least 4 points
                         2. Never give 0 points if the answer attempts to address the question
                         3. Focus on rewarding what's correct rather than penalizing what's missing
+                        4. Give 4 and below points or if not 0 to those who wote nothing or to those who tried but just written random contents
 
                         Return ONLY a Python dictionary with this format:
                         {
                             "score": x (between 1-10),
-                            "explanation": "Brief explanation of the score",
+                            "explanation": "Brief explanation of the score or why you've given the escore",
                             "feedback": "Specific suggestions for improvement"
                         }"""
     # Initialize session state
