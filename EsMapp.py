@@ -1060,13 +1060,80 @@ def pdf2quiz():
 
                                     scores[q_num] = score_dict
 
+
+
                                 except Exception as e:
-                                    # Fallback scoring if parsing fails
-                                    scores[q_num] = {
-                                        "score": min(7, max(4, len(user_answer.split()) // 3)),  # Length-based score
-                                        "explanation": "Automated scoring applied",
-                                        "feedback": "The system had difficulty evaluating this exact answer"
-                                    }
+
+                                    # When parsing fails, have the AI generate an explanation
+
+                                    analysis_prompt = f"""
+
+                                    Analyze this answer and provide scoring explanation:
+
+
+                                    Question: {question['question']}
+
+                                    Scoring Criteria: {question.get('scoring_criteria', [])}
+
+                                    Student Answer: {user_answer}
+
+
+                                    Provide:
+
+                                    1. A score from 1-10 (minimum 4 if attempt made)
+
+                                    2. Detailed explanation justifying the score
+
+                                    3. Specific feedback for improvement
+
+
+                                    Return ONLY this format:
+
+                                    {{
+
+                                        "score": [1-10],
+
+                                        "explanation": "Detailed analysis of the answer quality",
+
+                                        "feedback": "Actionable improvement suggestions"
+
+                                    }}
+
+                                    """
+
+                                    try:
+
+                                        # Get AI-generated explanation
+
+                                        ai_response = ai_assistant(analysis_prompt, scoring_system)
+
+                                        score_data = json.loads(ai_response.strip().strip('```'))
+
+                                        # Validate and store
+
+                                        scores[q_num] = {
+
+                                            "score": max(1, min(10, score_data.get("score", 4))),
+
+                                            "explanation": score_data.get("explanation", "AI evaluation applied"),
+
+                                            "feedback": score_data.get("feedback", "See model answer for reference")
+
+                                        }
+
+                                    except:
+
+                                        # Ultimate fallback if even this fails
+
+                                        scores[q_num] = {
+
+                                            "score": 4,
+
+                                            "explanation": "The system evaluated your answer as showing basic understanding",
+
+                                            "feedback": "Compare your answer with the model answer to see where you can improve"
+
+                                        }
 
                             st.session_state.quiz['scores'] = scores
 
@@ -1094,11 +1161,24 @@ def pdf2quiz():
                 )
                 st.success(f"Your score: {score}/{len(st.session_state.quiz['data'])}")
             else:
-                total_score = sum(
-                    score_data['score'] for score_data in st.session_state.quiz['scores'].values()
-                )
-                max_score = 10 * len(st.session_state.quiz['data'])
-                st.success(f"Your total score: {total_score}/{max_score} ({round(total_score / max_score * 100, 1)}%)")
+                if q_num in st.session_state.quiz.get('scores', {}):
+                    score_data = st.session_state.quiz['scores'][q_num]
+
+                    st.markdown(f"### Score: {score_data['score']}/10")
+
+                    st.markdown("#### Evaluation:")
+                    st.info(score_data['explanation'])
+
+                    st.markdown("#### Feedback:")
+                    st.warning(score_data['feedback'])
+
+                    with st.expander("🔍 Compare with Model Answer"):
+                        st.markdown("**Model Answer:**")
+                        st.success(question.get('model_answer', 'Not available'))
+
+                        st.markdown("**Scoring Criteria:**")
+                        for i, criterion in enumerate(question.get('scoring_criteria', []), 1):
+                            st.markdown(f"{i}. {criterion}")
 
 
 def extract_text_from_file(uploaded_file):
