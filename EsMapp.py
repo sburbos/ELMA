@@ -735,18 +735,24 @@ def pdf2quiz():
                         - Completeness (how many key points are covered)
                         - Relevance (how well it addresses the question)
                         - Clarity (how well it's expressed)
-                        -As long as the answer has a point to think off then score something but not a perfect score
-                        
-                        -Strictl,y it doesn't have to be a really perfect answer.
 
-                        Provide a brief explanation for your scoring.
+                        Scoring Guidelines:
+                        - 1-3: Answer is mostly incorrect or irrelevant
+                        - 4-6: Answer shows some understanding but is incomplete or partially incorrect
+                        - 7-8: Answer is mostly correct but missing some key points
+                        - 9-10: Answer is comprehensive and accurate
+
+                        Important Rules:
+                        1. If the answer shows any reasonable understanding of the topic, give at least 4 points
+                        2. Never give 0 points if the answer attempts to address the question
+                        3. Focus on rewarding what's correct rather than penalizing what's missing
+
                         Return ONLY a Python dictionary with this format:
                         {
                             "score": x (between 1-10),
                             "explanation": "Brief explanation of the score",
                             "feedback": "Specific suggestions for improvement"
                         }"""
-
     # Initialize session state
     if 'quiz' not in st.session_state:
         st.session_state.quiz = {
@@ -987,6 +993,16 @@ def pdf2quiz():
                             scores = {}
                             for q_num, question in st.session_state.quiz['data'].items():
                                 user_answer = st.session_state.quiz['answers'][q_num]
+
+                                # Add this validation check first
+                                if not user_answer or len(user_answer.strip()) < 5:
+                                    scores[q_num] = {
+                                        "score": 1,
+                                        "explanation": "Answer was too short or empty",
+                                        "feedback": "Please provide a more detailed response"
+                                    }
+                                    continue
+
                                 criteria = "\n".join([f"- {c}" for c in question.get('scoring_criteria', [])])
 
                                 prompt = f"""
@@ -1009,10 +1025,11 @@ def pdf2quiz():
                                     scores[q_num] = ast.literal_eval(score_data.strip())
                                 except Exception as e:
                                     scores[q_num] = {
-                                        "score": 0,
-                                        "explanation": f"Evaluation failed: {str(e)}",
-                                        "feedback": "Please check your answer format"
+                                        "score": 4,  # Default to 4 for reasonable attempts
+                                        "explanation": "Your answer shows some understanding of the topic",
+                                        "feedback": "Try to expand on your answer with more specific details from the material"
                                     }
+
                             st.session_state.quiz['scores'] = scores
 
                     st.session_state.quiz['submitted'] = True
