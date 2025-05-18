@@ -728,21 +728,22 @@ def pdf2quiz():
                         2. Include specific scoring_criteria
                         3. Questions require thoughtful responses"""
 
-    scoring_system = """You are an expert grader. Analyze the student's answer and provide:
-    1. Score (1-10)
-    2. Detailed explanation
-    3. Specific feedback
-    4. List of matched concepts
-    5. List of missing elements
-
-    Return ONLY this format:
+    scoring_system = """You are an expert grader. Analyze the student's answer and provide detailed feedback:
     {
         "score": [1-10],
-        "explanation": "Detailed analysis",
-        "feedback": "3 specific suggestions",
-        "key_matches": ["matched concepts"],
-        "missing_points": ["missing elements"]
-    }"""
+        "explanation": "Detailed analysis of the answer's strengths and weaknesses",
+        "feedback": "Three specific improvement suggestions separated by periods",
+        "key_matches": ["list of correctly addressed concepts"],
+        "missing_points": ["list of missing important elements"],
+        "model_answer": "The complete ideal answer that would score 10/10"
+    }
+    
+    Evaluation Criteria:
+    1. Accuracy (matches key concepts from study materials)
+    2. Completeness (covers all important points)
+    3. Specificity (includes relevant details and examples)
+    4. Organization (logical flow and clarity)
+    5. Depth (shows understanding beyond surface level)"""
 
     # Initialize session state
     if 'quiz' not in st.session_state:
@@ -917,7 +918,7 @@ def pdf2quiz():
         with col1:
             if not st.session_state.quiz['submitted'] and st.button("Submit", disabled=not all_answered):
                 if st.session_state.quiz['quiz_type'] == 'open_ended':
-                    with st.spinner("Grading answers..."):
+                    with st.spinner("Evaluating answers..."):
                         scores = {}
                         for q_num, question in st.session_state.quiz['data'].items():
                             user_answer = st.session_state.quiz['answers'][q_num]
@@ -925,48 +926,56 @@ def pdf2quiz():
                             if not user_answer or len(user_answer.strip()) < 5:
                                 scores[q_num] = {
                                     "score": 1,
-                                    "explanation": "Insufficient answer length",
-                                    "feedback": "Provide more detailed response. Address all question parts. Include examples.",
+                                    "explanation": "Answer was too short to evaluate properly",
+                                    "feedback": "1. Provide more detailed response. 2. Address all parts of the question. 3. Include specific examples.",
                                     "key_matches": [],
-                                    "missing_points": ["Substantial content"]
+                                    "missing_points": ["Substantial content", "Key concepts"],
+                                    "model_answer": question.get('model_answer', 'Not available')
                                 }
                                 continue
 
                             prompt = f"""
-                            Evaluate this answer thoroughly:
-                            Question: {question['question']}
-                            Model Answer: {question.get('model_answer', '')}
-                            Scoring Criteria: {question.get('scoring_criteria', [])}
-                            Student Answer: {user_answer}
+                                Evaluate this answer thoroughly based on the original study materials:
+                                Question: {question['question']}
+                                Scoring Criteria: {question.get('scoring_criteria', [])}
+                                Student Answer: {user_answer[:2000]}  # Limit to first 2000 chars
+                                Model Answer: {question.get('model_answer', '')[:2000]}
 
-                            Provide detailed evaluation with:
-                            - Score (1-10) based on how well it matches model answer and criteria
-                            - Paragraph explaining strengths and weaknesses
-                            - 3 specific suggestions for improvement
-                            - List of correctly addressed concepts
-                            - List of missing important elements
+                                Provide detailed evaluation with:
+                                - Score (1-10) based on the evaluation criteria
+                                - Paragraph explaining strengths and weaknesses
+                                - 3 specific suggestions for improvement
+                                - List of correctly addressed concepts
+                                - List of missing important elements
+                                - The complete model answer
 
-                            Return ONLY valid JSON format:
-                            {{
-                                "score": [1-10],
-                                "explanation": "Detailed analysis",
-                                "feedback": "Three specific improvement suggestions separated by periods",
-                                "key_matches": ["matched", "concepts"],
-                                "missing_points": ["missing", "elements"]
-                            }}
-                            """
+                                Return ONLY valid JSON format:
+                                {{
+                                    "score": [1-10],
+                                    "explanation": "Detailed analysis",
+                                    "feedback": "Three specific improvement suggestions separated by periods",
+                                    "key_matches": ["matched", "concepts"],
+                                    "missing_points": ["missing", "elements"],
+                                    "model_answer": "The complete ideal answer"
+                                }}
+                                """
 
                             try:
                                 score_data = ai_assistant(prompt, scoring_system)
                                 clean_data = score_data.strip().strip('```').strip()
                                 scores[q_num] = json.loads(clean_data)
+                                # Ensure model answer is preserved
+                                scores[q_num]['model_answer'] = question.get('model_answer',
+                                                                             scores[q_num].get('model_answer',
+                                                                                               'Not available'))
                             except Exception as e:
                                 scores[q_num] = {
                                     "score": 4,
-                                    "explanation": "Automated evaluation couldn't process fully.",
-                                    "feedback": "Compare with model answer. Check scoring criteria. Expand on key points.",
+                                    "explanation": "Automated evaluation encountered an error",
+                                    "feedback": "1. Compare with model answer. 2. Check scoring criteria. 3. Expand on key points.",
                                     "key_matches": [],
-                                    "missing_points": []
+                                    "missing_points": [],
+                                    "model_answer": question.get('model_answer', 'Not available')
                                 }
 
                         st.session_state.quiz['scores'] = scores
