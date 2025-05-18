@@ -695,9 +695,9 @@ def extract_pptx_text(pptx_file):
 
 
 def pdf2quiz():
-    # System prompts for different quiz types
-    system_condition_mcq = """You are a system only for creating a multiple choice quiz python dictionary. 
-                        Return ONLY a properly formatted Python dictionary with no additional text or explanation.
+    # System prompts
+    system_condition_mcq = """You are a system only for creating multiple choice quizzes. 
+                        Return ONLY a properly formatted Python dictionary.
                         Format:
                         {
                             "1": {
@@ -711,44 +711,37 @@ def pdf2quiz():
                             ...
                         }"""
 
-    system_condition_open = """You are a system only for creating an open-ended quiz python dictionary. 
-                        Return ONLY a properly formatted Python dictionary with no additional text or explanation.
+    system_condition_open = """You are a system only for creating open-ended quizzes. 
+                        Return ONLY a properly formatted Python dictionary.
                         Format:
                         {
                             "1": {
                                 "question": "Question text",
                                 "type": "definition/enumeration/essay",
-                                "model_answer": "The ideal answer that would score 10/10",
-                                "scoring_criteria": ["Key point 1", "Key point 2", "Key point 3"]
+                                "model_answer": "The ideal answer",
+                                "scoring_criteria": ["Key point 1", "Key point 2"]
                             },
                             ...
                         }
                         Important rules:
-                        1. ALWAYS include a detailed model_answer that would score 10/10
-                        2. Include specific scoring_criteria that should be present in a good answer
-                        3. Questions should require thoughtful responses, not just one-word answers
-                        4. Make sure model answers are directly based on the provided text content"""
+                        1. ALWAYS include a detailed model_answer
+                        2. Include specific scoring_criteria
+                        3. Questions require thoughtful responses"""
 
     scoring_system = """You are an expert grader. Analyze the student's answer and provide:
     1. Score (1-10)
-    2. Detailed explanation justifying the score
+    2. Detailed explanation
     3. Specific feedback
     4. List of matched concepts
     5. List of missing elements
 
-    Evaluation Criteria:
-    - Accuracy (matches model answer)
-    - Completeness (covers key points)
-    - Clarity (well-organized)
-    - Depth (insightful analysis)
-
     Return ONLY this format:
     {
         "score": [1-10],
-        "explanation": "Paragraph analyzing strengths/weaknesses",
-        "feedback": "3 specific improvement suggestions",
-        "key_matches": ["list", "of", "matched", "concepts"],
-        "missing_points": ["list", "of", "missing", "elements"]
+        "explanation": "Detailed analysis",
+        "feedback": "3 specific suggestions",
+        "key_matches": ["matched concepts"],
+        "missing_points": ["missing elements"]
     }"""
 
     # Initialize session state
@@ -769,7 +762,8 @@ def pdf2quiz():
     # Quiz type selection
     quiz_type = st.radio(
         "Quiz Type",
-        options=["Multiple Choice", "Open-Ended (Definition/Enumeration/Essay)"],
+        options=["Multiple Choice", "Open-Ended"],
+        index=0 if st.session_state.quiz['quiz_type'] == 'multiple_choice' else 1,
         key="quiz_type_selector"
     )
     st.session_state.quiz['quiz_type'] = 'multiple_choice' if quiz_type == "Multiple Choice" else 'open_ended'
@@ -777,17 +771,16 @@ def pdf2quiz():
     # File uploader
     uploaded_file = st.file_uploader("Upload File", type=["pdf", "pptx"])
 
-    # Custom prompt toggle
-    toggle_swap = st.toggle("Add Custom Prompt")
-    extra_prompt = st.text_area("Additional Instructions", "", height=150) if toggle_swap else ""
+    # Custom prompt
+    extra_prompt = st.text_area("Additional Instructions (Optional)", "", height=100)
 
     if uploaded_file:
         file_type = "PDF" if uploaded_file.name.endswith('.pdf') else "PPTX"
-        st.write(f"Uploaded {file_type} file: {uploaded_file.name} ({uploaded_file.size / 1024:.2f} KB)")
+        st.write(f"Uploaded {file_type} file: {uploaded_file.name}")
 
         number_quiz = st.number_input(
-            "Number of questions to generate",
-            min_value=1, max_value=100, value=5
+            "Number of questions",
+            min_value=1, max_value=20, value=5
         )
 
         if st.button("Generate Quiz"):
@@ -796,13 +789,13 @@ def pdf2quiz():
                     tmp_file.write(uploaded_file.getvalue())
                     tmp_file_path = tmp_file.name
 
-                extracted_text = extract_pdf_text(tmp_file_path) if uploaded_file.name.endswith(
-                    '.pdf') else extract_pptx_text(tmp_file_path)
+                extracted_text = extract_pdf_text(tmp_file_path) if file_type == "PDF" else extract_pptx_text(
+                    tmp_file_path)
 
-                if extracted_text and not extracted_text.startswith("No text"):
-                    full_prompt = f"""Create a {'multiple choice' if st.session_state.quiz['quiz_type'] == 'multiple_choice' else 'open-ended'} quiz based on:
-                    {extra_prompt if toggle_swap else ''}
-                    Text content: {extracted_text[:10000]}"""
+                if extracted_text:
+                    full_prompt = f"""Create a {quiz_type.lower()} quiz with {number_quiz} questions:
+                    {extra_prompt if extra_prompt else ''}
+                    Text content: {extracted_text[:8000]}"""
 
                     system_prompt = system_condition_mcq if st.session_state.quiz[
                                                                 'quiz_type'] == 'multiple_choice' else system_condition_open
@@ -810,29 +803,19 @@ def pdf2quiz():
 
                     if content_out:
                         try:
-                            clean_output = content_out.strip()
-                            if clean_output.startswith("```"):
-                                clean_output = clean_output.split("```")[1]
-                                if clean_output.startswith(("python", "json")):
-                                    clean_output = clean_output[6:].strip()
-                            clean_output = clean_output.strip().strip('"').strip("'")
+                            clean_output = content_out.strip().strip('```').strip()
+                            if clean_output.startswith(('python', 'json')):
+                                clean_output = clean_output[5:].strip()
 
                             quiz_data = ast.literal_eval(clean_output)
 
+                            # Ensure model answers exist for open-ended questions
                             if st.session_state.quiz['quiz_type'] == 'open_ended':
                                 for q_num, question in quiz_data.items():
                                     if 'model_answer' not in question:
-                                        question['model_answer'] = ai_assistant(
-                                            f"Create model answer for: {question['question']}\nText: {extracted_text[:5000]}",
-                                            "You create perfect model answers"
-                                        ) or "No model answer"
+                                        question['model_answer'] = "Model answer not generated"
                                     if 'scoring_criteria' not in question:
-                                        question['scoring_criteria'] = ast.literal_eval(
-                                            ai_assistant(
-                                                f"Create scoring criteria for: {question['question']}\nModel Answer: {question.get('model_answer', '')}",
-                                                "You create scoring criteria"
-                                            ) or "[]"
-                                        )
+                                        question['scoring_criteria'] = ["Content accuracy", "Completeness", "Clarity"]
 
                             st.session_state.quiz.update({
                                 'data': quiz_data,
@@ -845,12 +828,11 @@ def pdf2quiz():
 
                         except Exception as e:
                             st.error(f"Error processing quiz: {str(e)}")
-                            st.code(content_out)
 
-    # Quiz display and interaction
-    if st.session_state.quiz['data']:
-        st.subheader(f"{quiz_type} Quiz Generated from {st.session_state.quiz.get('file_type', 'File')}")
-        st.write(f"File: {st.session_state.quiz['file_processed'].name}")
+    # Quiz display
+    if st.session_state.quiz.get('data'):
+        st.subheader(f"{quiz_type} Quiz")
+        st.write(f"Source: {st.session_state.quiz['file_processed'].name}")
 
         all_answered = True
         for q_num, question in st.session_state.quiz['data'].items():
@@ -858,103 +840,117 @@ def pdf2quiz():
             st.write(question['question'])
 
             if st.session_state.quiz['quiz_type'] == 'multiple_choice':
-                options = [question['a'], question['b'], question['c'], question['d']]
-                current_answer = st.session_state.quiz['answers'].get(q_num)
+                options = [question[k] for k in ['a', 'b', 'c', 'd']]
                 user_choice = st.radio(
-                    "Select your answer:",
+                    "Select answer:",
                     options,
                     key=f"q_{q_num}_mcq",
-                    index=options.index(current_answer) if current_answer in options else None
+                    index=None
                 )
-                if user_choice != current_answer:
-                    st.session_state.quiz['answers'][q_num] = user_choice
-                    st.rerun()
+                st.session_state.quiz['answers'][q_num] = user_choice
             else:
-                current_answer = st.session_state.quiz['answers'].get(q_num, "")
                 user_answer = st.text_area(
                     "Your answer:",
-                    value=current_answer,
+                    value=st.session_state.quiz['answers'].get(q_num, ""),
                     key=f"q_{q_num}_open",
                     height=150
                 )
-                if user_answer != current_answer:
-                    st.session_state.quiz['answers'][q_num] = user_answer
-                    st.rerun()
+                st.session_state.quiz['answers'][q_num] = user_answer
 
             if st.session_state.quiz['answers'].get(q_num) is None:
                 all_answered = False
 
-            # Display feedback after submission
+            # Show results if submitted
             if st.session_state.quiz['submitted']:
                 if st.session_state.quiz['quiz_type'] == 'multiple_choice':
                     correct_answer = question[question['answer_key']]
                     if st.session_state.quiz['answers'][q_num] == correct_answer:
                         st.success("✓ Correct!")
+                    else:
+                        st.error(f"✗ Incorrect. Correct answer: {correct_answer}")
+                else:
+                    score_data = st.session_state.quiz['scores'].get(q_num, {})
 
-                    elif q_num in st.session_state.quiz.get('scores', {}):
-                        score_data = st.session_state.quiz['scores'][q_num]
+                    # Score display with colored bar
+                    score = score_data.get('score', 0)
+                    st.markdown(f"**Score:** {score}/10")
+                    st.progress(score / 10)
 
-                        # Display score
-                        st.markdown(f"**Score:** {score_data['score']}/10")
+                    # Explanation expander
+                    with st.expander("📝 Explanation", expanded=False):
+                        st.write(score_data.get('explanation', 'No explanation available'))
 
-                        # Display expandable explanation
-                        with st.expander("🔍 View Explanation", expanded=False):
-                            st.write(score_data.get('explanation', 'No explanation available'))
-                            if 'key_matches' in score_data:
-                                st.markdown("**✅ Correct Elements:**")
+                    # Feedback expander
+                    with st.expander("💡 Suggestions", expanded=False):
+                        feedback = score_data.get('feedback', '').split('. ')
+                        for point in feedback:
+                            if point.strip():
+                                st.markdown(f"- {point.strip()}")
+
+                    # Detailed analysis expander
+                    with st.expander("🔍 Detailed Analysis", expanded=False):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if 'key_matches' in score_data and score_data['key_matches']:
+                                st.markdown("✅ **Correct Elements:**")
                                 for item in score_data['key_matches']:
                                     st.markdown(f"- {item}")
-                            if 'missing_points' in score_data:
-                                st.markdown("**🔍 Missing Elements:**")
+
+                        with col2:
+                            if 'missing_points' in score_data and score_data['missing_points']:
+                                st.markdown("🔴 **Missing Elements:**")
                                 for item in score_data['missing_points']:
                                     st.markdown(f"- {item}")
 
-                        # Display expandable suggestions
-                        with st.expander("💡 View Suggestions", expanded=False):
-                            st.write(score_data.get('feedback', 'No suggestions available'))
-
-                        # Display expandable model answer
-                        with st.expander("📚 View Model Answer", expanded=False):
-                            st.markdown("**Scoring Criteria:**")
-                            for criterion in question.get('scoring_criteria', []):
-                                st.markdown(f"- {criterion}")
-                            st.markdown("**Model Answer:**")
-                            st.success(question.get('model_answer', 'Not available'))
-                    else:
-                        st.error(f"✗ Incorrect. The correct answer is: {correct_answer}")
+                    # Model answer expander
+                    with st.expander("📚 Model Answer", expanded=False):
+                        st.markdown("**Scoring Criteria:**")
+                        for criterion in question.get('scoring_criteria', []):
+                            st.markdown(f"- {criterion}")
+                        st.markdown("**Model Answer:**")
+                        st.write(question.get('model_answer', 'Not available'))
 
             st.markdown("---")
 
-        # Submission and reset buttons
+        # Submission buttons
         col1, col2 = st.columns(2)
         with col1:
-            if not st.session_state.quiz['submitted'] and st.button("Submit Answers", disabled=not all_answered):
+            if not st.session_state.quiz['submitted'] and st.button("Submit", disabled=not all_answered):
                 if st.session_state.quiz['quiz_type'] == 'open_ended':
-                    with st.spinner("Evaluating answers..."):
+                    with st.spinner("Grading answers..."):
                         scores = {}
                         for q_num, question in st.session_state.quiz['data'].items():
                             user_answer = st.session_state.quiz['answers'][q_num]
 
-                            if not user_answer or len(user_answer.strip()) < 3:
+                            if not user_answer or len(user_answer.strip()) < 5:
                                 scores[q_num] = {
                                     "score": 1,
-                                    "explanation": "Answer too short",
-                                    "feedback": "Please provide a more detailed answer"
+                                    "explanation": "Insufficient answer length",
+                                    "feedback": "Provide more detailed response. Address all question parts. Include examples.",
+                                    "key_matches": [],
+                                    "missing_points": ["Substantial content"]
                                 }
                                 continue
 
                             prompt = f"""
-                            Evaluate this answer:
+                            Evaluate this answer thoroughly:
                             Question: {question['question']}
                             Model Answer: {question.get('model_answer', '')}
                             Scoring Criteria: {question.get('scoring_criteria', [])}
                             Student Answer: {user_answer}
 
-                            Return ONLY this format:
+                            Provide detailed evaluation with:
+                            - Score (1-10) based on how well it matches model answer and criteria
+                            - Paragraph explaining strengths and weaknesses
+                            - 3 specific suggestions for improvement
+                            - List of correctly addressed concepts
+                            - List of missing important elements
+
+                            Return ONLY valid JSON format:
                             {{
                                 "score": [1-10],
                                 "explanation": "Detailed analysis",
-                                "feedback": "Specific improvements",
+                                "feedback": "Three specific improvement suggestions separated by periods",
                                 "key_matches": ["matched", "concepts"],
                                 "missing_points": ["missing", "elements"]
                             }}
@@ -967,8 +963,8 @@ def pdf2quiz():
                             except Exception as e:
                                 scores[q_num] = {
                                     "score": 4,
-                                    "explanation": "Automated evaluation",
-                                    "feedback": "Compare with model answer",
+                                    "explanation": "Automated evaluation couldn't process fully.",
+                                    "feedback": "Compare with model answer. Check scoring criteria. Expand on key points.",
                                     "key_matches": [],
                                     "missing_points": []
                                 }
@@ -992,6 +988,7 @@ def pdf2quiz():
 
         # Display total score after all questions
         if st.session_state.quiz['submitted']:
+            st.markdown("---")
             if st.session_state.quiz['quiz_type'] == 'multiple_choice':
                 correct = sum(
                     1 for q_num, question in st.session_state.quiz['data'].items()
@@ -1001,7 +998,32 @@ def pdf2quiz():
             else:
                 total = sum(score['score'] for score in st.session_state.quiz['scores'].values())
                 max_score = 10 * len(st.session_state.quiz['data'])
-                st.markdown(f"## 🏆 Total Score: {total}/{max_score} ({round(total / max_score * 100, 1)}%)")
+                percentage = round(total / max_score * 100, 1)
+
+                # Enhanced score display
+                st.markdown(f"""
+                ## 🏆 Final Results
+                <div style="background-color:#f0f2f6; padding:20px; border-radius:10px;">
+                    <h2 style="color:#333; text-align:center;">
+                        Total Score: <span style="color:#4CAF50;">{total}</span>/{max_score} 
+                        ({percentage}%)
+                    </h2>
+                    <p style="text-align:center;">
+                        {get_performance_feedback(percentage)}
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+
+
+def get_performance_feedback(percentage):
+    if percentage >= 90:
+        return "Excellent work! You've demonstrated a thorough understanding of the material."
+    elif percentage >= 75:
+        return "Good job! You've shown solid comprehension with room for refinement."
+    elif percentage >= 60:
+        return "Fair attempt. Review the material and focus on the missing concepts."
+    else:
+        return "Needs improvement. Please review the model answers and try again."
 
 def extract_text_from_file(uploaded_file):
     """Extract text from uploaded file based on its type."""
