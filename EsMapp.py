@@ -696,7 +696,7 @@ def extract_pptx_text(pptx_file):
 
 def pdf2quiz():
     # System prompts for different quiz types
-    system_condition_mcq = """You are a system only for creating a multiple choice quiz python dictionary. 
+    system_condition_mcq = """You are a system only for creating multiple choice quiz python dictionaries. 
                         Return ONLY a properly formatted Python dictionary with no additional text or explanation.
                         Format:
                         {
@@ -711,23 +711,23 @@ def pdf2quiz():
                             ...
                         }"""
 
-    system_condition_open = """You are a system only for creating an open-ended quiz python dictionary. 
+    system_condition_open = """You are a system only for creating open-ended quiz python dictionaries. 
                         Return ONLY a properly formatted Python dictionary with no additional text or explanation.
                         Format:
                         {
                             "1": {
                                 "question": "Question text",
                                 "type": "definition/enumeration/essay",
-                                "model_answer": "The ideal answer that would score 10/10",
+                                "model_answer": "The ideal answer that would score 10/10 (3-5 sentences minimum)",
                                 "scoring_criteria": ["Key point 1", "Key point 2", "Key point 3"]
                             },
                             ...
                         }
                         Important rules:
-                        1. ALWAYS include a detailed model_answer that would score 10/10
-                        2. Include specific scoring_criteria that should be present in a good answer
-                        3. Questions should require thoughtful responses, not just one-word answers
-                        4. Make sure model answers are directly based on the provided text content"""
+                        1. ALWAYS include a detailed model_answer (minimum 3 sentences)
+                        2. Include 3-5 specific scoring_criteria
+                        3. Questions should require paragraph-length responses
+                        4. Model answers must be directly based on provided content"""
 
     scoring_system = """You are an expert grader. Analyze the student's answer and provide:
     1. Score (1-10)
@@ -735,12 +735,6 @@ def pdf2quiz():
     3. Specific feedback
     4. List of matched concepts
     5. List of missing elements
-
-    Evaluation Criteria:
-    - Accuracy (matches model answer)
-    - Completeness (covers key points)
-    - Clarity (well-organized)
-    - Depth (insightful analysis)
 
     Return ONLY this format:
     {
@@ -760,101 +754,124 @@ def pdf2quiz():
             'file_processed': None,
             'file_type': None,
             'quiz_type': 'multiple_choice',
-            'scores': {}
+            'scores': {},
+            'custom_topic': None
         }
 
-    st.title("File to Quiz Generator")
-    st.subheader("Upload PDF or PPTX to generate a quiz")
+    st.title("📝 Smart Quiz Generator")
+    st.subheader("Create quizzes from files or custom topics")
 
     # Quiz type selection
     quiz_type = st.radio(
         "Quiz Type",
-        options=["Multiple Choice", "Open-Ended (Definition/Enumeration/Essay)"],
+        options=["Multiple Choice", "Open-Ended"],
         key="quiz_type_selector"
     )
     st.session_state.quiz['quiz_type'] = 'multiple_choice' if quiz_type == "Multiple Choice" else 'open_ended'
 
-    # File uploader
-    uploaded_file = st.file_uploader("Upload File", type=["pdf", "pptx"])
+    # Content source selection
+    content_source = st.radio(
+        "Content Source",
+        options=["Upload File", "Custom Topic"],
+        horizontal=True,
+        key="content_source"
+    )
 
-    # Custom prompt toggle
-    toggle_swap = st.toggle("Add Custom Prompt")
-    extra_prompt = st.text_area("Additional Instructions", "", height=150) if toggle_swap else ""
-
-    if uploaded_file:
-        file_type = "PDF" if uploaded_file.name.endswith('.pdf') else "PPTX"
-        st.write(f"Uploaded {file_type} file: {uploaded_file.name} ({uploaded_file.size / 1024:.2f} KB)")
-
-        number_quiz = st.number_input(
-            "Number of questions to generate",
-            min_value=1, max_value=100, value=5
+    if content_source == "Upload File":
+        uploaded_file = st.file_uploader("Upload PDF or PPTX", type=["pdf", "pptx"])
+        custom_topic = None
+    else:
+        custom_topic = st.text_area(
+            "Enter your custom topic/subject:",
+            placeholder="e.g., Machine Learning, World War II, Python Programming...",
+            key="custom_topic"
         )
+        uploaded_file = None
+        st.session_state.quiz['custom_topic'] = custom_topic
 
-        if st.button("Generate Quiz"):
+    number_quiz = st.number_input(
+        "Number of questions to generate",
+        min_value=1, max_value=20, value=5
+    )
+
+    if st.button("Generate Quiz", type="primary"):
+        if (uploaded_file is None) and (custom_topic is None or custom_topic.strip() == ""):
+            st.warning("Please either upload a file or enter a custom topic")
+        else:
             with st.spinner(f"Generating {quiz_type.lower()} quiz..."):
-                with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
-                    tmp_file.write(uploaded_file.getvalue())
-                    tmp_file_path = tmp_file.name
+                extracted_text = ""
+                if uploaded_file:
+                    with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+                        tmp_file.write(uploaded_file.getvalue())
+                        tmp_file_path = tmp_file.name
 
-                extracted_text = extract_pdf_text(tmp_file_path) if uploaded_file.name.endswith(
-                    '.pdf') else extract_pptx_text(tmp_file_path)
+                    extracted_text = extract_pdf_text(tmp_file_path) if uploaded_file.name.endswith(
+                        '.pdf') else extract_pptx_text(tmp_file_path)
 
+                full_prompt = f"""Create {number_quiz} {'multiple choice' if st.session_state.quiz['quiz_type'] == 'multiple_choice' else 'open-ended'} questions"""
+
+                if custom_topic:
+                    full_prompt += f" about: {custom_topic}"
                 if extracted_text and not extracted_text.startswith("No text"):
-                    full_prompt = f"""Create a {'multiple choice' if st.session_state.quiz['quiz_type'] == 'multiple_choice' else 'open-ended'} quiz based on:
-                    {extra_prompt if toggle_swap else ''}
-                    Text content: {extracted_text[:10000]}"""
+                    full_prompt += f"\nText content: {extracted_text[:10000]}"
 
-                    system_prompt = system_condition_mcq if st.session_state.quiz[
-                                                                'quiz_type'] == 'multiple_choice' else system_condition_open
-                    content_out = ai_assistant(full_prompt, system_prompt)
+                system_prompt = system_condition_mcq if st.session_state.quiz[
+                                                            'quiz_type'] == 'multiple_choice' else system_condition_open
+                content_out = ai_assistant(full_prompt, system_prompt)
 
-                    if content_out:
-                        try:
-                            clean_output = content_out.strip()
-                            if clean_output.startswith("```"):
-                                clean_output = clean_output.split("```")[1]
-                                if clean_output.startswith(("python", "json")):
-                                    clean_output = clean_output[6:].strip()
-                            clean_output = clean_output.strip().strip('"').strip("'")
+                if content_out:
+                    try:
+                        clean_output = content_out.strip()
+                        if clean_output.startswith("```"):
+                            clean_output = clean_output.split("```")[1]
+                            if clean_output.startswith(("python", "json")):
+                                clean_output = clean_output[6:].strip()
+                        clean_output = clean_output.strip().strip('"').strip("'")
 
-                            # Handle the case where the output might be incomplete
-                            if not clean_output.endswith('}'):
-                                clean_output += '}'
+                        # Ensure valid JSON format
+                        if not clean_output.endswith('}'):
+                            clean_output += '}'
 
-                            quiz_data = ast.literal_eval(clean_output)
+                        quiz_data = ast.literal_eval(clean_output)
 
-                            if st.session_state.quiz['quiz_type'] == 'open_ended':
-                                for q_num, question in quiz_data.items():
-                                    if 'model_answer' not in question:
-                                        question['model_answer'] = ai_assistant(
-                                            f"Create model answer for: {question['question']}\nText: {extracted_text[:5000]}",
-                                            "You create perfect model answers"
-                                        ) or "No model answer"
-                                    if 'scoring_criteria' not in question:
-                                        question['scoring_criteria'] = ast.literal_eval(
-                                            ai_assistant(
-                                                f"Create scoring criteria for: {question['question']}\nModel Answer: {question.get('model_answer', '')}",
-                                                "You create scoring criteria"
-                                            ) or "[]"
-                                        )
+                        if st.session_state.quiz['quiz_type'] == 'open_ended':
+                            for q_num, question in quiz_data.items():
+                                if 'model_answer' not in question or len(question['model_answer'].split()) < 15:
+                                    question['model_answer'] = ai_assistant(
+                                        f"Create detailed model answer for: {question['question']}\nContent: {extracted_text[:5000] if extracted_text else custom_topic}",
+                                        "Create perfect model answers (minimum 3 sentences)"
+                                    ) or "No model answer generated"
+                                if 'scoring_criteria' not in question or len(question['scoring_criteria']) < 3:
+                                    question['scoring_criteria'] = ast.literal_eval(
+                                        ai_assistant(
+                                            f"Create 3-5 scoring criteria for: {question['question']}\nModel Answer: {question.get('model_answer', '')}",
+                                            "You create specific scoring criteria"
+                                        ) or "[]"
+                                    )
 
-                            st.session_state.quiz.update({
-                                'data': quiz_data,
-                                'answers': {q_num: None for q_num in quiz_data},
-                                'file_processed': uploaded_file,
-                                'file_type': file_type,
-                                'scores': {}
-                            })
-                            st.rerun()
+                        st.session_state.quiz.update({
+                            'data': quiz_data,
+                            'answers': {q_num: None for q_num in quiz_data},
+                            'file_processed': uploaded_file,
+                            'file_type': "PDF" if uploaded_file and uploaded_file.name.endswith(
+                                '.pdf') else "PPTX" if uploaded_file else "Custom Topic",
+                            'scores': {},
+                            'submitted': False
+                        })
+                        st.rerun()
 
-                        except Exception as e:
-                            st.error(f"Error processing quiz: {str(e)}")
-                            st.code(content_out)
+                    except Exception as e:
+                        st.error(f"Error processing quiz: {str(e)}")
+                        st.code(content_out)
 
     # Quiz display and interaction
     if st.session_state.quiz['data']:
-        st.subheader(f"{quiz_type} Quiz Generated from {st.session_state.quiz.get('file_type', 'File')}")
-        st.write(f"File: {st.session_state.quiz['file_processed'].name}")
+        st.divider()
+        st.subheader(f"{quiz_type} Quiz Generated from {st.session_state.quiz.get('file_type', 'Custom Topic')}")
+        if st.session_state.quiz['file_processed']:
+            st.write(f"File: {st.session_state.quiz['file_processed'].name}")
+        elif st.session_state.quiz['custom_topic']:
+            st.write(f"Topic: {st.session_state.quiz['custom_topic']}")
 
         all_answered = True
         for q_num, question in st.session_state.quiz['data'].items():
@@ -903,22 +920,14 @@ def pdf2quiz():
                     st.markdown(f"**Score:** {score_data.get('score', 0)}/10")
 
                     # Explanation expander
-                    with st.expander("📝 Explanation", expanded=False):
+                    with st.expander("📝 Detailed Feedback", expanded=False):
                         st.write(score_data.get('explanation', 'No explanation available'))
-
-                    # Detailed analysis expander
-                    with st.expander("🔍 Detailed Analysis", expanded=False):
-                        if 'key_matches' in score_data and score_data['key_matches']:
-                            st.markdown("✅ **Correct Elements:**")
-                            for item in score_data['key_matches']:
-                                st.markdown(f"- {item}")
-                        if 'missing_points' in score_data and score_data['missing_points']:
-                            st.markdown("🔴 **Missing Elements:**")
-                            for item in score_data['missing_points']:
-                                st.markdown(f"- {item}")
+                        if 'feedback' in score_data:
+                            st.markdown("**Suggestions for improvement:**")
+                            st.write(score_data['feedback'])
 
                     # Model answer expander
-                    with st.expander("📚 Model Answer", expanded=False):
+                    with st.expander("📚 Model Answer & Criteria", expanded=False):
                         st.markdown("**Scoring Criteria:**")
                         for criterion in question.get('scoring_criteria', []):
                             st.markdown(f"- {criterion}")
@@ -937,18 +946,18 @@ def pdf2quiz():
                         for q_num, question in st.session_state.quiz['data'].items():
                             user_answer = st.session_state.quiz['answers'][q_num]
 
-                            if not user_answer or len(user_answer.strip()) < 3:
+                            if not user_answer or len(user_answer.strip()) < 10:
                                 scores[q_num] = {
                                     "score": 1,
-                                    "explanation": "Answer too short",
-                                    "feedback": "Please provide a more detailed answer",
+                                    "explanation": "Answer too short or empty",
+                                    "feedback": "Please provide a more detailed answer (minimum 2-3 sentences)",
                                     "key_matches": [],
                                     "missing_points": ["Substantial content", "Key concepts"]
                                 }
                                 continue
 
                             prompt = f"""
-                            Evaluate this answer:
+                            Evaluate this answer against the model:
                             Question: {question['question']}
                             Model Answer: {question.get('model_answer', '')}
                             Scoring Criteria: {question.get('scoring_criteria', [])}
@@ -970,9 +979,9 @@ def pdf2quiz():
                                 scores[q_num] = json.loads(clean_data)
                             except Exception as e:
                                 scores[q_num] = {
-                                    "score": 4,
-                                    "explanation": "Automated evaluation",
-                                    "feedback": "Compare with model answer",
+                                    "score": 5,
+                                    "explanation": "Automated evaluation failed",
+                                    "feedback": "Compare your answer with the model answer",
                                     "key_matches": [],
                                     "missing_points": []
                                 }
@@ -990,22 +999,26 @@ def pdf2quiz():
                     'file_processed': None,
                     'file_type': None,
                     'quiz_type': 'multiple_choice',
-                    'scores': {}
+                    'scores': {},
+                    'custom_topic': None
                 }
                 st.rerun()
 
-        # Display total score after all questions
+        # Display total score after submission
         if st.session_state.quiz['submitted']:
+            st.divider()
             if st.session_state.quiz['quiz_type'] == 'multiple_choice':
                 correct = sum(
                     1 for q_num, question in st.session_state.quiz['data'].items()
                     if st.session_state.quiz['answers'][q_num] == question[question['answer_key']]
                 )
-                st.success(f"Your score: {correct}/{len(st.session_state.quiz['data'])}")
+                st.success(
+                    f"🎯 Your score: {correct}/{len(st.session_state.quiz['data'])} ({correct / len(st.session_state.quiz['data']) * 100:.1f}%)")
             else:
                 total = sum(score['score'] for score in st.session_state.quiz['scores'].values())
                 max_score = 10 * len(st.session_state.quiz['data'])
-                st.markdown(f"## 🏆 Total Score: {total}/{max_score} ({round(total / max_score * 100, 1)}%)")
+                st.success(f"🎯 Total Score: {total}/{max_score} ({total / max_score * 100:.1f}%)")
+
 
 def extract_text_from_file(uploaded_file):
     """Extract text from uploaded file based on its type."""
