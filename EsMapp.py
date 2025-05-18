@@ -1158,43 +1158,41 @@ def pdf2quiz():
                 if q_num in st.session_state.quiz.get('scores', {}):
                     score_data = st.session_state.quiz['scores'][q_num]
 
-                    # Create columns for better layout
-                    col1, col2 = st.columns([1, 4])
+                    # Question display
+                    st.markdown(f"**Question {q_num}**")
+                    st.write(question['question'])
 
-                    with col1:
-                        st.markdown(f"**Score:** {score_data['score']}/10")
+                    # User answer display
+                    st.markdown("**Your answer:**")
+                    st.text(st.session_state.quiz['answers'][q_num])
 
-                    with col2:
-                        # Make explanation expandable
-                        with st.expander(f"Explanation for Q{q_num}", expanded=False):
-                            st.markdown("**Detailed Evaluation:**")
-                            st.write(score_data.get('explanation', 'No detailed explanation available'))
+                    # Score and expandable sections
+                    st.markdown(f"**Score:** {score_data['score']}/10")
 
-                            if 'key_matches' in score_data and score_data['key_matches']:
-                                st.markdown("**✔️ Correct Elements:**")
-                                for item in score_data['key_matches']:
-                                    st.markdown(f"- {item}")
+                    # Explanation section
+                    with st.expander("🔍 View Explanation", expanded=False):
+                        st.write(score_data.get('explanation', 'No explanation available'))
 
-                            if 'missing_points' in score_data and score_data['missing_points']:
-                                st.markdown("**✖️ Missing Elements:**")
-                                for item in score_data['missing_points']:
-                                    st.markdown(f"- {item}")
+                    # Suggestions section
+                    with st.expander("💡 View Suggestions", expanded=False):
+                        st.write(score_data.get('feedback', 'No suggestions available'))
 
-                    # Feedback section
-                    st.markdown("**Feedback:**")
-                    st.info(score_data.get('feedback', 'No specific feedback available'))
-
-                    # Model answer comparison (collapsed by default)
-                    with st.expander(f"📖 View Model Answer for Q{q_num}", expanded=False):
+                    # Model answer (collapsed by default)
+                    with st.expander("📚 View Model Answer", expanded=False):
                         st.markdown("**Scoring Criteria:**")
                         for i, criterion in enumerate(question.get('scoring_criteria', []), 1):
                             st.markdown(f"{i}. {criterion}")
-
                         st.markdown("**Model Answer:**")
                         st.success(question.get('model_answer', 'Not available'))
 
-                        st.markdown("**Your Answer:**")
-                        st.text(st.session_state.quiz['answers'][q_num])
+            # Display total score only after all questions
+            if st.session_state.quiz['submitted'] and st.session_state.quiz['quiz_type'] == 'open_ended':
+                total_score = sum(
+                    score_data['score'] for score_data in st.session_state.quiz['scores'].values()
+                )
+                max_score = 10 * len(st.session_state.quiz['data'])
+                st.markdown("---")
+                st.markdown(f"## Total Score: {total_score}/{max_score} ({round(total_score / max_score * 100, 1)}%)")
 
 def extract_text_from_file(uploaded_file):
     """Extract text from uploaded file based on its type."""
