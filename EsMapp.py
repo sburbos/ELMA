@@ -729,31 +729,25 @@ def pdf2quiz():
                         3. Questions should require thoughtful responses, not just one-word answers
                         4. Make sure model answers are directly based on the provided text content"""
 
-    scoring_system = """You are an expert grader. Evaluate the student's answer based on the model answer and scoring criteria.
-                        Score each answer from 1-10 based on:
-                        - Accuracy (how correct the information is)
-                        - Completeness (how many key points are covered)
-                        - Relevance (how well it addresses the question)
-                        - Clarity (how well it's expressed)
+    scoring_system = """You are an expert grader. Analyze the student's answer and provide:
+    1. Score (1-10)
+    2. Detailed explanation justifying the score
+    3. Specific feedback
 
-                        Scoring Guidelines:
-                        - 1-3: Answer is mostly incorrect or irrelevant
-                        - 4-6: Answer shows some understanding but is incomplete or partially incorrect
-                        - 7-8: Answer is mostly correct but missing some key points
-                        - 9-10: Answer is comprehensive and accurate
+    Evaluation Criteria:
+    - Accuracy (matches model answer)
+    - Completeness (covers key points)
+    - Clarity (well-organized)
+    - Depth (insightful analysis)
 
-                        Important Rules:
-                        1. If the answer shows any reasonable understanding of the topic, give at least 4 points
-                        2. Never give 0 points if the answer attempts to address the question
-                        3. Focus on rewarding what's correct rather than penalizing what's missing
-                        4. Give 4 and below points or if not 0 to those who wote nothing or to those who tried but just written random contents
-
-                        Return ONLY a Python dictionary with this format:
-                        {
-                            "score": x (between 1-10),
-                            "explanation": "Brief explanation of the score or why you've given the escore",
-                            "feedback": "Specific suggestions for improvement"
-                        }"""
+    Return ONLY this format:
+    {
+        "score": [1-10],
+        "explanation": "Paragraph analyzing strengths/weaknesses",
+        "feedback": "3 specific improvement suggestions",
+        "key_matches": ["list", "of", "matched", "concepts"],
+        "missing_points": ["list", "of", "missing", "elements"]
+    }"""
     # Initialize session state
     if 'quiz' not in st.session_state:
         st.session_state.quiz = {
@@ -1164,22 +1158,42 @@ def pdf2quiz():
                 if q_num in st.session_state.quiz.get('scores', {}):
                     score_data = st.session_state.quiz['scores'][q_num]
 
+                    # Score header
+                    st.markdown(f"## 📝 Evaluation for Question {q_num}")
                     st.markdown(f"### Score: {score_data['score']}/10")
 
-                    st.markdown("#### Evaluation:")
-                    st.info(score_data['explanation'])
+                    # Detailed explanation
+                    with st.expander("🔍 Detailed Analysis", expanded=True):
+                        st.markdown("### Explanation")
+                        st.write(score_data.get('explanation', 'No analysis available'))
 
-                    st.markdown("#### Feedback:")
-                    st.warning(score_data['feedback'])
+                        if 'key_matches' in score_data:
+                            st.markdown("**✅ Concepts you included:**")
+                            for concept in score_data['key_matches']:
+                                st.markdown(f"- {concept}")
 
-                    with st.expander("🔍 Compare with Model Answer"):
-                        st.markdown("**Model Answer:**")
-                        st.success(question.get('model_answer', 'Not available'))
+                        if 'missing_points' in score_data:
+                            st.markdown("**🔍 Areas to improve:**")
+                            for point in score_data['missing_points']:
+                                st.markdown(f"- {point}")
+
+                    # Actionable feedback
+                    st.markdown("### 💡 How to Improve")
+                    st.info(score_data.get('feedback', 'No specific feedback available'))
+
+                    # Model answer comparison
+                    with st.expander("📚 Compare with Model Answer"):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.markdown("**Your Answer:**")
+                            st.text(st.session_state.quiz['answers'][q_num])
+                        with col2:
+                            st.markdown("**Model Answer:**")
+                            st.success(question.get('model_answer', 'Not available'))
 
                         st.markdown("**Scoring Criteria:**")
                         for i, criterion in enumerate(question.get('scoring_criteria', []), 1):
                             st.markdown(f"{i}. {criterion}")
-
 
 def extract_text_from_file(uploaded_file):
     """Extract text from uploaded file based on its type."""
