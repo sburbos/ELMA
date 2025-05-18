@@ -1158,42 +1158,43 @@ def pdf2quiz():
                 if q_num in st.session_state.quiz.get('scores', {}):
                     score_data = st.session_state.quiz['scores'][q_num]
 
-                    # Score header
-                    st.markdown(f"## 📝 Evaluation for Question {q_num}")
-                    st.markdown(f"### Score: {score_data['score']}/10")
+                    # Create columns for better layout
+                    col1, col2 = st.columns([1, 4])
 
-                    # Detailed explanation
-                    with st.expander("🔍 Detailed Analysis", expanded=True):
-                        st.markdown("### Explanation")
-                        st.write(score_data.get('explanation', 'No analysis available'))
+                    with col1:
+                        st.markdown(f"**Score:** {score_data['score']}/10")
 
-                        if 'key_matches' in score_data:
-                            st.markdown("**✅ Concepts you included:**")
-                            for concept in score_data['key_matches']:
-                                st.markdown(f"- {concept}")
+                    with col2:
+                        # Make explanation expandable
+                        with st.expander(f"Explanation for Q{q_num}", expanded=False):
+                            st.markdown("**Detailed Evaluation:**")
+                            st.write(score_data.get('explanation', 'No detailed explanation available'))
 
-                        if 'missing_points' in score_data:
-                            st.markdown("**🔍 Areas to improve:**")
-                            for point in score_data['missing_points']:
-                                st.markdown(f"- {point}")
+                            if 'key_matches' in score_data and score_data['key_matches']:
+                                st.markdown("**✔️ Correct Elements:**")
+                                for item in score_data['key_matches']:
+                                    st.markdown(f"- {item}")
 
-                    # Actionable feedback
-                    st.markdown("### 💡 How to Improve")
+                            if 'missing_points' in score_data and score_data['missing_points']:
+                                st.markdown("**✖️ Missing Elements:**")
+                                for item in score_data['missing_points']:
+                                    st.markdown(f"- {item}")
+
+                    # Feedback section
+                    st.markdown("**Feedback:**")
                     st.info(score_data.get('feedback', 'No specific feedback available'))
 
-                    # Model answer comparison
-                    with st.expander("📚 Compare with Model Answer"):
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.markdown("**Your Answer:**")
-                            st.text(st.session_state.quiz['answers'][q_num])
-                        with col2:
-                            st.markdown("**Model Answer:**")
-                            st.success(question.get('model_answer', 'Not available'))
-
+                    # Model answer comparison (collapsed by default)
+                    with st.expander(f"📖 View Model Answer for Q{q_num}", expanded=False):
                         st.markdown("**Scoring Criteria:**")
                         for i, criterion in enumerate(question.get('scoring_criteria', []), 1):
                             st.markdown(f"{i}. {criterion}")
+
+                        st.markdown("**Model Answer:**")
+                        st.success(question.get('model_answer', 'Not available'))
+
+                        st.markdown("**Your Answer:**")
+                        st.text(st.session_state.quiz['answers'][q_num])
 
 def extract_text_from_file(uploaded_file):
     """Extract text from uploaded file based on its type."""
