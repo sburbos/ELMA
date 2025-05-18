@@ -817,6 +817,10 @@ def pdf2quiz():
                                     clean_output = clean_output[6:].strip()
                             clean_output = clean_output.strip().strip('"').strip("'")
 
+                            # Handle the case where the output might be incomplete
+                            if not clean_output.endswith('}'):
+                                clean_output += '}'
+
                             quiz_data = ast.literal_eval(clean_output)
 
                             if st.session_state.quiz['quiz_type'] == 'open_ended':
