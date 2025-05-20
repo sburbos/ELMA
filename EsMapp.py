@@ -54,7 +54,7 @@ def ai_assistant(prompt, rule):
             model="gemini-2.0-flash",
             messages=messages,
             temperature=0.7,
-            max_tokens=2048
+            max_tokens=20000
         )
 
         if response.choices and response.choices[0].message.content:
