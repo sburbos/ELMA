@@ -793,6 +793,7 @@ def pdf2quiz():
         "Number of questions to generate",
         min_value=1, max_value=100, value=6
     )
+    content_prompt = st.text_area("Extra Prompt", "", height=90)
 
     if st.button("Generate Quiz", type="primary"):
         if (uploaded_file is None) and (custom_topic is None or custom_topic.strip() == ""):
@@ -808,7 +809,9 @@ def pdf2quiz():
                     extracted_text = extract_pdf_text(tmp_file_path) if uploaded_file.name.endswith(
                         '.pdf') else extract_pptx_text(tmp_file_path)
 
-                full_prompt = f"""Create {number_quiz} {'multiple choice' if st.session_state.quiz['quiz_type'] == 'multiple_choice' else 'open-ended'} questions"""
+                full_prompt = f"""Create {number_quiz} {'multiple choice' if st.session_state.quiz['quiz_type'] == 'multiple_choice' else 'open-ended'} questions. Additional info to consider
+                : {content_prompt}
+                """
 
                 if custom_topic:
                     full_prompt += f" about: {custom_topic}"
@@ -1430,5 +1433,6 @@ pages={ "Tools": [st.Page(main_page, title="Home"), st.Page(aito, title="AITO"),
         }
 pg = st.navigation(pages)
 pg.run()
+
 
 
