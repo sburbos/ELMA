@@ -51,7 +51,7 @@ def ai_assistant(prompt, rule):
             messages.extend(prompt)
 
         response = client.chat.completions.create(
-            model="gemini-2.0-flash",
+            model="gemini-3-flash-preview",
             messages=messages,
             temperature=0.7,
             max_tokens=20000
@@ -1433,6 +1433,7 @@ pages={ "Tools": [st.Page(main_page, title="Home"), st.Page(aito, title="AITO"),
         }
 pg = st.navigation(pages)
 pg.run()
+
 
 
 
