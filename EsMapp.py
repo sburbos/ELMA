@@ -654,28 +654,62 @@ def symbol_quiz():
     # ── PDF extraction ────────────────────────────────────────
     def extract_image_pairs(uploaded_file) -> list:
         """
-        For each page, grab every embedded image and find its closest
-        text label. Returns list of {"img_bytes": bytes, "answer": str}.
+        Layout-aware extraction that handles:
+          • Two-column PDFs  (symbol | label side by side)
+          • Grid PDFs        (symbol top, label below — multiple columns)
+          • Single-column    (symbol above or below its label)
 
-        Strategy:
-          • Get all text blocks on the page (type=0).
-          • For each image, find the text block whose top edge (by0) is
-            closest to the image's bottom edge (img_rect.y1).
-          • Also checks text ABOVE the image in case the label precedes it.
-          • Skips images that are too large (likely decorative page backgrounds)
-            or too small (likely bullets/icons with no real meaning).
+        Core idea:
+          1. Detect if the page is split into columns by finding a
+             vertical "gap" in the x-positions of images vs text.
+          2. For each image, only consider text blocks that are in the
+             SAME logical cell — defined by matching column band AND
+             matching row band.  This prevents a symbol in column-1
+             from stealing the label that belongs to column-2.
+          3. Within the candidate set, pick the text block whose
+             vertical center is closest to the image's vertical center.
         """
         raw = uploaded_file.read()
-        doc = fitz.open(stream=raw, filetype="pdf")
+        doc  = fitz.open(stream=raw, filetype="pdf")
         pairs = []
         seen_xrefs = set()
 
+        # ── Helper: cluster 1-D values into groups ────────────
+        def cluster_1d(values, gap=40):
+            """Split sorted float list into groups separated by > gap."""
+            if not values:
+                return []
+            groups, cur = [], [values[0]]
+            for v in values[1:]:
+                if v - cur[-1] > gap:
+                    groups.append(cur)
+                    cur = []
+                cur.append(v)
+            groups.append(cur)
+            return groups
+
+        # ── Helper: which band index does a value fall into ───
+        def band_of(value, bands):
+            """Return index of band whose range contains value."""
+            for i, b in enumerate(bands):
+                if b[0] - 20 <= value <= b[-1] + 20:
+                    return i
+            # fallback: nearest band centre
+            centres = [(sum(b)/len(b), i) for i, b in enumerate(bands)]
+            return min(centres, key=lambda x: abs(x[0] - value))[1]
+
         for page in doc:
-            page_rect   = page.rect
-            page_area   = page_rect.width * page_rect.height
-            img_list    = page.get_images(full=True)
+            page_w    = page.rect.width
+            page_h    = page.rect.height
+            page_area = page_w * page_h
+            img_list  = page.get_images(full=True)
             text_blocks = [b for b in page.get_text("blocks") if b[6] == 0 and b[4].strip()]
 
+            if not img_list or not text_blocks:
+                continue
+
+            # ── Step 1: collect image rects, skip bad ones ────
+            img_data = []   # (rect, img_bytes)
             for img_info in img_list:
                 xref = img_info[0]
                 if xref in seen_xrefs:
@@ -684,98 +718,118 @@ def symbol_quiz():
 
                 base_img  = doc.extract_image(xref)
                 img_bytes = base_img["image"]
-                img_w     = base_img.get("width", 0)
-                img_h     = base_img.get("height", 0)
+                iw        = base_img.get("width",  0)
+                ih        = base_img.get("height", 0)
 
-                # Skip images that are too tiny or fill the whole page
-                if img_w < 20 or img_h < 20:
+                if iw < 15 or ih < 15:
                     continue
-                if img_w * img_h > 0.5 * page_area:
+                if iw * ih > 0.45 * page_area:
                     continue
 
                 rects = page.get_image_rects(xref)
                 if not rects:
                     continue
-                img_rect = rects[0]
-                img_cx   = (img_rect.x0 + img_rect.x1) / 2
-                img_cy   = (img_rect.y0 + img_rect.y1) / 2
+                img_data.append((rects[0], img_bytes))
 
-                # Score each text block by proximity + horizontal alignment
-                def block_score(b):
-                    bx0, by0, bx1, by1 = b[0], b[1], b[2], b[3]
-                    bcx = (bx0 + bx1) / 2
-                    # vertical distance from image edge to block edge
-                    vert = min(abs(by0 - img_rect.y1), abs(by1 - img_rect.y0))
-                    # horizontal offset penalty
-                    horiz = abs(bcx - img_cx) * 0.3
-                    return vert + horiz
+            if not img_data:
+                continue
 
-                if not text_blocks:
+            # ── Step 2: detect column layout ─────────────────
+            # Gather x-centres of images and text blocks
+            img_cx_vals  = sorted([(r.x0 + r.x1) / 2 for r, _ in img_data])
+            text_cx_vals = sorted([(b[0] + b[2]) / 2 for b in text_blocks])
+
+            img_col_groups  = cluster_1d(img_cx_vals,  gap=page_w * 0.15)
+            text_col_groups = cluster_1d(text_cx_vals, gap=page_w * 0.15)
+
+            # Decide pairing orientation per column group:
+            # If images and text share the same column band → label is above/below (vertical layout)
+            # If image columns and text columns are DIFFERENT bands → label is to the right/left (horizontal layout)
+            num_img_cols  = len(img_col_groups)
+            num_text_cols = len(text_col_groups)
+
+            # Are there more text column bands than image column bands?
+            # That's the classic "left half = symbols, right half = labels" split.
+            split_layout = (num_text_cols > num_img_cols) or (
+                num_img_cols >= 2 and
+                abs(img_col_groups[0][-1] - text_col_groups[0][0]) > page_w * 0.1
+            )
+
+            # ── Step 3: detect row bands ──────────────────────
+            img_cy_vals = sorted([(r.y0 + r.y1) / 2 for r, _ in img_data])
+            row_groups  = cluster_1d(img_cy_vals, gap=page_h * 0.08)
+
+            # ── Step 4: pair each image with its label ────────
+            for img_rect, img_bytes in img_data:
+                icx = (img_rect.x0 + img_rect.x1) / 2
+                icy = (img_rect.y0 + img_rect.y1) / 2
+
+                img_col_idx = band_of(icx, img_col_groups)
+                img_row_idx = band_of(icy, row_groups)
+
+                if split_layout:
+                    # ── Horizontal split: image is in left column,
+                    #    label is in the SAME ROW in the right column.
+                    # Find the text column(s) that are to the RIGHT of this image col.
+                    img_col_right_edge = img_col_groups[img_col_idx][-1]
+
+                    # Candidate text blocks: must be to the right AND in same row band
+                    row_top    = row_groups[img_row_idx][0]  - page_h * 0.06
+                    row_bottom = row_groups[img_row_idx][-1] + page_h * 0.06
+
+                    candidates = [
+                        b for b in text_blocks
+                        if b[0] > img_col_right_edge - 10          # to the right
+                        and b[0] < img_rect.x0 + page_w * 0.6      # not too far right
+                        and row_top <= (b[1] + b[3]) / 2 <= row_bottom  # same row band
+                    ]
+
+                    # Fallback: if nothing to the right, look directly below
+                    if not candidates:
+                        candidates = [
+                            b for b in text_blocks
+                            if abs((b[0] + b[2]) / 2 - icx) < page_w * 0.25  # same column
+                            and b[1] > img_rect.y1 - 5                         # below image
+                            and b[1] < img_rect.y1 + 80                        # not too far
+                        ]
+
+                else:
+                    # ── Vertical layout: label is above or below, same column band
+                    col_left  = img_col_groups[img_col_idx][0]  - page_w * 0.12
+                    col_right = img_col_groups[img_col_idx][-1] + page_w * 0.12
+
+                    candidates = [
+                        b for b in text_blocks
+                        if col_left <= (b[0] + b[2]) / 2 <= col_right   # same column
+                        and (
+                            # directly below
+                            (b[1] >= img_rect.y1 - 8 and b[1] <= img_rect.y1 + 90)
+                            or
+                            # directly above
+                            (b[3] <= img_rect.y0 + 8 and b[3] >= img_rect.y0 - 90)
+                        )
+                    ]
+
+                if not candidates:
                     continue
 
-                best = min(text_blocks, key=block_score)
+                # Pick candidate whose vertical centre is closest to image's vertical centre
+                best  = min(candidates, key=lambda b: abs((b[1] + b[3]) / 2 - icy))
                 label = best[4].strip().replace("\n", " ")
 
-                # Only keep if label is reasonably close (within 120 pts)
-                if block_score(best) > 120:
+                # Reject labels that look like instructions/long sentences
+                # (real symbol labels are usually short — under 60 chars)
+                if not label or len(label) > 120:
+                    continue
+                # Skip labels that are mostly digits (page numbers, dimensions)
+                word_chars = sum(c.isalpha() for c in label)
+                if word_chars < 2:
                     continue
 
                 pairs.append({"img_bytes": img_bytes, "answer": label})
 
-        # ── Strategy B: vector drawings ──────────────────────
-        # Many symbol PDFs use drawn vector paths instead of embedded
-        # raster images. Render the page at high DPI, cluster the
-        # drawing paths spatially, then crop each cluster out.
-        if not pairs:
-            for page in doc:
-                page_area   = page.rect.width * page.rect.height
-                text_blocks = [b for b in page.get_text("blocks") if b[6] == 0 and b[4].strip()]
-                drawings    = page.get_drawings()
-                if not drawings:
-                    continue
-                draw_rects = [fitz.Rect(d["rect"]) for d in drawings if d.get("rect")]
-                if not draw_rects:
-                    continue
-
-                # Merge nearby rects into clusters (each symbol = group of paths)
-                clusters, used = [], [False] * len(draw_rects)
-                for i_r, r in enumerate(draw_rects):
-                    if used[i_r]:
-                        continue
-                    cluster  = fitz.Rect(r)
-                    used[i_r] = True
-                    changed  = True
-                    while changed:
-                        changed = False
-                        for j_r, r2 in enumerate(draw_rects):
-                            if not used[j_r]:
-                                grown = fitz.Rect(cluster.x0-40, cluster.y0-40, cluster.x1+40, cluster.y1+40)
-                                if grown.intersects(r2):
-                                    cluster.include_rect(r2)
-                                    used[j_r] = True
-                                    changed    = True
-                    if cluster.width > 12 and cluster.height > 12 and cluster.get_area() < 0.4 * page_area:
-                        clusters.append(cluster)
-
-                mat = fitz.Matrix(3, 3)
-                for cluster in clusters:
-                    padded = fitz.Rect(cluster.x0-6, cluster.y0-6, cluster.x1+6, cluster.y1+6).intersect(page.rect)
-                    pix       = page.get_pixmap(matrix=mat, clip=padded, alpha=False)
-                    img_bytes = pix.tobytes("png")
-                    cx = (cluster.x0 + cluster.x1) / 2
-
-                    def bsv(b):
-                        bx0, by0, bx1, by1 = b[0], b[1], b[2], b[3]
-                        return min(abs(by0 - cluster.y1), abs(by1 - cluster.y0)) + abs((bx0+bx1)/2 - cx) * 0.3
-
-                    if not text_blocks:
-                        continue
-                    best  = min(text_blocks, key=bsv)
-                    label = best[4].strip().replace("\n", " ")
-                    if bsv(best) <= 150 and label:
-                        pairs.append({"img_bytes": img_bytes, "answer": label})
-
         doc.close()
+
         # Deduplicate by answer text
         seen, unique = set(), []
         for p in pairs:
