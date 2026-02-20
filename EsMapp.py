@@ -2,7 +2,6 @@
 import streamlit as st
 import openai
 import tempfile
-from attr import NothingType
 from openai import OpenAI
 import google.generativeai as genai
 import edge_tts
@@ -18,33 +17,30 @@ from difflib import SequenceMatcher
 import os
 import requests
 import json
-
-# Initialize the OpenAI client with proper configuration
+import fitz          # PyMuPDF  → pip install pymupdf
+import base64
+from PIL import Image
+import io
+import random
 
 st.set_page_config(
     page_title="LleY",
     page_icon=":writing_hand:",
     layout="wide"
 )
-st.logo("final logo 2.png", icon_image="enlarge 1.png", size = "large")
-
-#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
-#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
+st.logo("final logo 2.png", icon_image="enlarge 1.png", size="large")
 
 
 def ai_assistant(prompt, rule):
     """OpenAI-compatible wrapper for Gemini 2.0 Flash"""
     try:
         client = OpenAI(
-            api_key="AIzaSyBN-rHdqfUbXL0H66zYb7cjwfUCU7ZFGtg",  # Your Gemini API key
+            api_key="AIzaSyBN-rHdqfUbXL0H66zYb7cjwfUCU7ZFGtg",
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
         )
-
-        # Format messages correctly
         messages = []
         if rule:
             messages.append({"role": "system", "content": rule})
-
         if isinstance(prompt, str):
             messages.append({"role": "user", "content": prompt})
         elif isinstance(prompt, list):
@@ -56,217 +52,132 @@ def ai_assistant(prompt, rule):
             temperature=0.7,
             max_tokens=20000
         )
-
         if response.choices and response.choices[0].message.content:
             return response.choices[0].message.content
         return None
-
     except Exception as e:
         st.error(f"API Error: {str(e)}")
         return None
 
+
+# ─────────────────────────────────────────────────────────────
+#  MAIN PAGE
+# ─────────────────────────────────────────────────────────────
 def main_page():
     st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@700&display=swap');
-
-        /* Remove all default margins/padding */
         html, body, .stApp {
-            overflow: hidden !important;
-            height: 100vh !important;
-            width: 100vw !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            background: #000 !important;
+            overflow: hidden !important; height: 100vh !important;
+            width: 100vw !important; margin: 0 !important;
+            padding: 0 !important; background: #000 !important;
         }
-
-        /* Centered container */
         .center-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
         }
-
-        /* Main text styling */
         .main-text {
             font-family: 'Chakra Petch', sans-serif;
-            font-size: clamp(3rem, 10vw, 8rem);
-            font-weight: 700;
-            color: #ff6a6a;
-            text-transform: uppercase;
-            letter-spacing: 0.5rem;
-            text-align: center;
-            position: relative;
-            z-index: 10;
+            font-size: clamp(3rem, 10vw, 8rem); font-weight: 700;
+            color: #ff6a6a; text-transform: uppercase;
+            letter-spacing: 0.5rem; text-align: center;
+            position: relative; z-index: 10;
         }
-
-        /* Orbiting circles container */
         .orbit-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 1;
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%; pointer-events: none; z-index: 1;
         }
-
-        /* Circle styling */
         .orbiting-circle {
-            position: absolute;
-            border-radius: 50%;
-            background: transparent;
-            border: 2px solid #ff69b4;
+            position: absolute; border-radius: 50%;
+            background: transparent; border: 2px solid #ff69b4;
             filter: drop-shadow(0 0 5px #ff1493);
             transform-origin: center center;
         }
     </style>
     """, unsafe_allow_html=True)
 
-    # JavaScript for orbiting circles animation
     html("""
     <script>
-    // Wait for Streamlit to fully load
     function waitForElm(selector) {
         return new Promise(resolve => {
-            if (document.querySelector(selector)) {
-                return resolve(document.querySelector(selector));
-            }
-
+            if (document.querySelector(selector)) return resolve(document.querySelector(selector));
             const observer = new MutationObserver(mutations => {
-                if (document.querySelector(selector)) {
-                    observer.disconnect();
-                    resolve(document.querySelector(selector));
-                }
+                if (document.querySelector(selector)) { observer.disconnect(); resolve(document.querySelector(selector)); }
             });
-
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
+            observer.observe(document.body, { childList: true, subtree: true });
         });
     }
-
     waitForElm('.center-container').then((container) => {
-        // Create orbit container
         const orbitContainer = document.createElement('div');
         orbitContainer.className = 'orbit-container';
         container.prepend(orbitContainer);
-
         const centerX = window.innerWidth / 2;
         const centerY = window.innerHeight / 2;
-
-        // Create 8 orbiting circles
         for (let i = 0; i < 8; i++) {
             const circle = document.createElement('div');
             circle.className = 'orbiting-circle';
-
-            // Different properties for each circle
             const size = 20 + (i * 15);
             const radius = 80 + (i * 60);
             const speed = 0.2 + (i * 0.05);
             const startAngle = (i * Math.PI * 2) / 8;
-
-            circle.style.width = `${size}px`;
-            circle.style.height = `${size}px`;
+            circle.style.width = `${size}px`; circle.style.height = `${size}px`;
             circle.style.borderWidth = `${1 + (i * 0.3)}px`;
-
             let angle = startAngle;
             function animate() {
                 angle += speed * 0.01;
                 const x = centerX + Math.cos(angle) * radius;
                 const y = centerY + Math.sin(angle) * radius;
-                circle.style.left = `${x - size/2}px`;
-                circle.style.top = `${y - size/2}px`;
+                circle.style.left = `${x - size/2}px`; circle.style.top = `${y - size/2}px`;
                 requestAnimationFrame(animate);
             }
-
-            orbitContainer.appendChild(circle);
-            animate();
+            orbitContainer.appendChild(circle); animate();
         }
-
-        // Disable scrolling
         document.body.style.overflow = 'hidden';
         window.addEventListener('scroll', () => window.scrollTo(0, 0));
     });
     </script>
     """)
 
-    # Page structure - just the text container
     st.markdown("""
     <div class="center-container">
         <div class="main-text">LleY</div>
     </div>
     """, unsafe_allow_html=True)
-# Debug: Show loaded secrets (remove after testing)
 
+
+# ─────────────────────────────────────────────────────────────
+#  ESSAY MAKER
+# ─────────────────────────────────────────────────────────────
 def esma():
-
-    # Rest of your app...
-
     list_essay_type = [
         "Argumentative", "Persuasive", 'Explanatory', 'Descriptive',
         "Narrative", 'Cause and Effect', "Process Analysis",
         "Compare/Contrast", "Critique", "Definition", "General"
     ]
-
     list_level = ["Elementary", "Junior High", "Senior High", "Undergraduate", "Graduate", "Postgraduate", "PhD",
                   "Masters", "Doctorate"]
     list_speech_type = ["Casual", "Intimate", "Formal", "Frozen", "Consultative"]
     left, right = st.columns(2, vertical_alignment="top")
-
     languages = ["English (US)", "Filipino", "Hindi"]
-
-    content_list_category = ["Facebook", "Youtube", "Tiktok", "Twitter/X", "Reddit", 'Instagram', "Spotify", ]
-    content_list_content = ["Vlog", "Blog", "Written Post", "Podcast", "Music", "Article", ]
-    content_list_complexity = ["Micro-Content", "Standard Content", "Premium Content", "Enterprise Content",
-                               "Legacy Content", ]
-    content_list_tiers = ["Beginner", "Intermediate", "Advanced", "Expert", ]
+    content_list_category = ["Facebook", "Youtube", "Tiktok", "Twitter/X", "Reddit", 'Instagram', "Spotify"]
+    content_list_content = ["Vlog", "Blog", "Written Post", "Podcast", "Music", "Article"]
+    content_list_complexity = ["Micro-Content", "Standard Content", "Premium Content", "Enterprise Content", "Legacy Content"]
+    content_list_tiers = ["Beginner", "Intermediate", "Advanced", "Expert"]
     content_creator_types = [
-        # YouTube/TikTok Types
-        "The Guru",
-        "The Everyman",
-        "The Mad Scientist",
-        "The Storyteller",
-        "The Entertainer",
-
-        # Educational Content Types
-        "The Professor",
-        "The Simplifier",
-        "The Debunker",
-        "The Coach",
-
-        # Fiction/Narrative Types
-        "The Hero",
-        "The Mentor",
-        "The Trickster",
-        "The Villain",
-
-        # Additional Digital Types
-        "The Reactor",
-        "The Investigator",
-        "The Trendsetter",
-        "The Parodist",
-        "The Nostalgist",
-        "The Minimalist",
+        "The Guru", "The Everyman", "The Mad Scientist", "The Storyteller", "The Entertainer",
+        "The Professor", "The Simplifier", "The Debunker", "The Coach",
+        "The Hero", "The Mentor", "The Trickster", "The Villain",
+        "The Reactor", "The Investigator", "The Trendsetter", "The Parodist", "The Nostalgist", "The Minimalist",
     ]
     condition_system = """You are EsMa. Strictly only write the requested essay content or content creation scripts. 
                         Do not write any other information. Meaning, only write paragraphs (unless user chose content creation). 
                         Also the output must have be clear and specific with no vague output"""
 
-
-    # Main app interface
     def main():
         with st.container():
             left.subheader("EsMa by Elley")
             left.title("Your AI content generator")
-            right.subheader("")
-            right.title("")
         on = left.toggle("Activate Content Creation")
         if not on:
             with st.container():
@@ -275,23 +186,19 @@ def esma():
                 essay_type = left.selectbox("Essay Type", list_essay_type)
                 speech = left.selectbox("Select Language", languages)
                 word_num = left.slider("Select Number Words", min_value=0, max_value=1500, step=100)
-                selected_pov = left.segmented_control('Point of View', ['First', 'Second', 'Third'],
-                                                      selection_mode="single")
-
+                selected_pov = left.segmented_control('Point of View', ['First', 'Second', 'Third'], selection_mode="single")
             with st.container():
                 content_prompt = left.text_area("Prompt", "", height=150)
                 other_info_prompt = left.text_area("Other Instructions", "", height=70)
-
                 if st.button("Generate Essay"):
                     if content_prompt.strip() in ("", "Generated prompt"):
                         st.warning("Please enter a valid prompt")
                     else:
                         with st.spinner("Generating your essay..."):
-                            full_prompt = f"Write a comprehensive {essay_type}, point of view: {selected_pov} point of view, education level: {level_essay}, language to use:{speech},  type of speech: {speech_type}, number of minimum words: {word_num}, essay about: {content_prompt}. With extra task {other_info_prompt}"
+                            full_prompt = f"Write a comprehensive {essay_type}, point of view: {selected_pov} point of view, education level: {level_essay}, language to use:{speech}, type of speech: {speech_type}, number of minimum words: {word_num}, essay about: {content_prompt}. With extra task {other_info_prompt}"
                             essay = ai_assistant(full_prompt, condition_system)
                             if essay:
                                 right.text_area("Generated Essay", value=essay, height=680)
-
                 else:
                     right.text_area("Generated Essay", "", height=680)
         else:
@@ -303,300 +210,74 @@ def esma():
                 selected_character = left.selectbox("Archetype", content_creator_types)
                 word_num = left.slider("Select Number Words", min_value=0, max_value=1500, step=100)
                 speech = left.segmented_control('Language', languages, selection_mode="single")
-
             with st.container():
                 content_prompt = left.text_area("Prompt", "", height=150)
                 other_info_prompt = left.text_area("Other Instructions", "", height=70)
-
                 if st.button("Generate Essay"):
                     if content_prompt.strip() in ("", "Generated prompt"):
                         st.warning("Please enter a valid prompt")
                     else:
-                        with st.spinner("Generating your essay..."):
-                            full_prompt = f"""Write a content about: {content_prompt} in a language:{speech} , having a word length of: {word_num}, that will be posted or used in: {content_place}
-                            having a content type: {content_type}, having a content complexity: {content_complexity}, having a content tier for: {content_tier}
-                            and will portray a character: {selected_character}. With extra task {other_info_prompt}
-
-"""
+                        with st.spinner("Generating your content..."):
+                            full_prompt = f"""Write a content about: {content_prompt} in a language:{speech}, having a word length of: {word_num}, that will be posted or used in: {content_place}
+having a content type: {content_type}, having a content complexity: {content_complexity}, having a content tier for: {content_tier}
+and will portray a character: {selected_character}. With extra task {other_info_prompt}"""
                             content_out = ai_assistant(full_prompt, condition_system)
                             if content_out:
                                 right.text_area("Generated Content", value=content_out, height=680)
-
                 else:
                     right.text_area("Generated Content", "", height=680)
 
     if __name__ == "__main__":
         main()
+    main()
 
 
+# ─────────────────────────────────────────────────────────────
+#  TTS VOICES
+# ─────────────────────────────────────────────────────────────
 voices_by_gender = {
     "Male": {
-        "AbdullahNeural (Oman)": {"ShortName": "ar-OM-AbdullahNeural"},
-        "AliNeural (Bahrain)": {"ShortName": "ar-BH-AliNeural"},
-        "AhmetNeural (Turkey)": {"ShortName": "tr-TR-AhmetNeural"},
-        "AledNeural (Wales)": {"ShortName": "cy-GB-AledNeural"},
-        "AleksandarNeural (North Macedonia)": {"ShortName": "mk-MK-AleksandarNeural"},
-        "AlvaroNeural (Spain)": {"ShortName": "es-ES-AlvaroNeural"},
-        "AlonsoNeural (United States)": {"ShortName": "es-US-AlonsoNeural"},
-        "AndresNeural (Guatemala)": {"ShortName": "es-GT-AndresNeural"},
-        "AntoineNeural (Canada)": {"ShortName": "fr-CA-AntoineNeural"},
-        "AntoninNeural (Czech)": {"ShortName": "cs-CZ-AntoninNeural"},
-        "AnbuNeural (Singapore)": {"ShortName": "ta-SG-AnbuNeural"},
-        "ArdiNeural (Indonesian)": {"ShortName": "id-ID-ArdiNeural"},
-        "ArnaudNeural (Belgium)": {"ShortName": "nl-BE-ArnaudNeural"},
-        "AsadNeural (Pakistan)": {"ShortName": "ur-PK-AsadNeural"},
-        "AviNeural (Israel)": {"ShortName": "he-IL-AvriNeural"},
-        "BabekNeural (Azerbaijani)": {"ShortName": "az-AZ-BabekNeural"},
-        "BashkarNeural (Bengali)": {"ShortName": "bn-IN-BashkarNeural"},
-        "BasselNeural (Iraq)": {"ShortName": "ar-IQ-BasselNeural"},
-        "BorislavNeural (Bulgarian)": {"ShortName": "bg-BG-BorislavNeural"},
-        "CarlosNeural (Honduras)": {"ShortName": "es-HN-CarlosNeural"},
-        "ChilembaNeural (Kenya)": {"ShortName": "en-KE-ChilembaNeural"},
         "ChristopherNeural (US)": {"ShortName": "en-US-ChristopherNeural"},
-        "ColmNeural (Irish)": {"ShortName": "ga-IE-ColmNeural"},
-        "ConradNeural (German)": {"ShortName": "de-DE-ConradNeural"},
-        "ConnorNeural (Ireland)": {"ShortName": "en-IE-ConnorNeural"},
-        "DauletNeural (Kazakh)": {"ShortName": "kk-KZ-DauletNeural"},
-        "DaudNeural (Tanzania)": {"ShortName": "sw-TZ-DaudiNeural"},
-        "DmitryNeural (Russian)": {"ShortName": "ru-RU-DmitryNeural"},
-        "DiegoNeural (Italian)": {"ShortName": "it-IT-DiegoNeural"},
-        "DimasNeural (Javanese)": {"ShortName": "jv-ID-DimasNeural"},
-        "DuarteNeural (Portuguese)": {"ShortName": "pt-PT-DuarteNeural"},
-        "EmilNeural (Romanian)": {"ShortName": "ro-RO-EmilNeural"},
-        "EnricNeural (Catalan)": {"ShortName": "ca-ES-EnricNeural"},
         "EricNeural (US)": {"ShortName": "en-US-EricNeural"},
-        "EveritaNeural (Latvian)": {"ShortName": "lv-LV-EveritaNeural"},
-        "FabriceNeural (Swiss French)": {"ShortName": "fr-CH-FabriceNeural"},
-        "FaridNeural (Persian)": {"ShortName": "fa-IR-FaridNeural"},
-        "FedericoNeural (Nicaragua)": {"ShortName": "es-NI-FedericoNeural"},
-        "FinnNeural (Norwegian)": {"ShortName": "nb-NO-FinnNeural"},
-        "GaganNeural (Kannada)": {"ShortName": "kn-IN-GaganNeural"},
-        "GerardNeural (Belgian French)": {"ShortName": "fr-BE-GerardNeural"},
-        "GiorgiNeural (Georgian)": {"ShortName": "ka-GE-GiorgiNeural"},
-        "GonzaloNeural (Colombia)": {"ShortName": "es-CO-GonzaloNeural"},
-        "GoranNeural (Bosnian)": {"ShortName": "bs-BA-GoranNeural"},
-        "GulNawazNeural (Pashto)": {"ShortName": "ps-AF-GulNawazNeural"},
-        "GunnarNeural (Icelandic)": {"ShortName": "is-IS-GunnarNeural"},
         "GuyNeural (US)": {"ShortName": "en-US-GuyNeural"},
-        "HamdanNeural (UAE)": {"ShortName": "ar-AE-HamdanNeural"},
-        "HamedNeural (Saudi Arabia)": {"ShortName": "ar-SA-HamedNeural"},
-        "HarriNeural (Finnish)": {"ShortName": "fi-FI-HarriNeural"},
-        "HenriNeural (French)": {"ShortName": "fr-FR-HenriNeural"},
-        "HediNeural (Tunisia)": {"ShortName": "ar-TN-HediNeural"},
-        "IlirNeural (Albanian)": {"ShortName": "sq-AL-IlirNeural"},
-        "InJoonNeural (Korean)": {"ShortName": "ko-KR-InJoonNeural"},
-        "IsmaelNeural (Algeria)": {"ShortName": "ar-DZ-IsmaelNeural"},
-        "JanNeural (Swiss German)": {"ShortName": "de-CH-JanNeural"},
-        "JajangNeural (Sundanese)": {"ShortName": "su-ID-JajangNeural"},
-        "JamalNeural (Morocco)": {"ShortName": "ar-MA-JamalNeural"},
-        "JavierNeural (Equatorial Guinea)": {"ShortName": "es-GQ-JavierNeural"},
-        "JeanNeural (Canadian French)": {"ShortName": "fr-CA-JeanNeural"},
-        "JeppeNeural (Danish)": {"ShortName": "da-DK-JeppeNeural"},
-        "JonasNeural (Austrian German)": {"ShortName": "de-AT-JonasNeural"},
-        "JorgeNeural (Mexico)": {"ShortName": "es-MX-JorgeNeural"},
-        "JosephNeural (Maltese)": {"ShortName": "mt-MT-JosephNeural"},
-        "JuanNeural (Costa Rica)": {"ShortName": "es-CR-JuanNeural"},
-        "KertNeural (Estonian)": {"ShortName": "et-EE-KertNeural"},
-        "KillianNeural (German)": {"ShortName": "de-DE-KillianNeural"},
-        "KumarNeural (Sri Lanka Tamil)": {"ShortName": "ta-LK-KumarNeural"},
-        "LaithNeural (Syria)": {"ShortName": "ar-SY-LaithNeural"},
-        "LiamNeural (Canada)": {"ShortName": "en-CA-LiamNeural"},
-        "LeonasNeural (Lithuanian)": {"ShortName": "lt-LT-LeonasNeural"},
-        "LorenzoNeural (Chile)": {"ShortName": "es-CL-LorenzoNeural"},
-        "LukasNeural (Slovak)": {"ShortName": "sk-SK-LukasNeural"},
-        "LuisNeural (Ecuador)": {"ShortName": "es-EC-LuisNeural"},
-        "LukeNeural (South Africa)": {"ShortName": "en-ZA-LukeNeural"},
-        "MadhurNeural (Hindi)": {"ShortName": "hi-IN-MadhurNeural"},
-        "MaartenNeural (Dutch)": {"ShortName": "nl-NL-MaartenNeural"},
-        "ManoharNeural (Marathi)": {"ShortName": "mr-IN-ManoharNeural"},
-        "ManuelNeural (Cuba)": {"ShortName": "es-CU-ManuelNeural"},
-        "MarekNeural (Polish)": {"ShortName": "pl-PL-MarekNeural"},
-        "MarioNeural (Paraguay)": {"ShortName": "es-PY-MarioNeural"},
-        "MateoNeural (Uruguay)": {"ShortName": "es-UY-MateoNeural"},
-        "MattiasNeural (Swedish)": {"ShortName": "sv-SE-MattiasNeural"},
-        "MidhunNeural (Malayalam)": {"ShortName": "ml-IN-MidhunNeural"},
-        "MitchellNeural (New Zealand)": {"ShortName": "en-NZ-MitchellNeural"},
-        "MohanNeural (Telugu)": {"ShortName": "te-IN-MohanNeural"},
-        "MoazNeural (Qatar)": {"ShortName": "ar-QA-MoazNeural"},
-        "MuuseNeural (Somali)": {"ShortName": "so-SO-MuuseNeural"},
-        "NamMinhNeural (Vietnamese)": {"ShortName": "vi-VN-NamMinhNeural"},
-        "NestorasNeural (Greek)": {"ShortName": "el-GR-NestorasNeural"},
-        "NicholasNeural (Serbian)": {"ShortName": "sr-RS-NicholasNeural"},
-        "NilsNeural (Latvian)": {"ShortName": "lv-LV-NilsNeural"},
-        "NiranjanNeural (Gujarati)": {"ShortName": "gu-IN-NiranjanNeural"},
-        "NiwatNeural (Thai)": {"ShortName": "th-TH-NiwatNeural"},
-        "OmarNeural (Libya)": {"ShortName": "ar-LY-OmarNeural"},
-        "OstapNeural (Ukrainian)": {"ShortName": "uk-UA-OstapNeural"},
-        "OsmanNeural (Malay)": {"ShortName": "ms-MY-OsmanNeural"},
-        "PisethNeural (Khmer)": {"ShortName": "km-KH-PisethNeural"},
-        "PrabhatNeural (Indian English)": {"ShortName": "en-IN-PrabhatNeural"},
-        "PradeepNeural (Bangla)": {"ShortName": "bn-BD-PradeepNeural"},
-        "RafikiNeural (Swahili Kenya)": {"ShortName": "sw-KE-RafikiNeural"},
-        "RamiNeural (Lebanon)": {"ShortName": "ar-LB-RamiNeural"},
-        "RokNeural (Slovenian)": {"ShortName": "sl-SI-RokNeural"},
         "RogerNeural (US)": {"ShortName": "en-US-RogerNeural"},
-        "RoiNeural (Galician)": {"ShortName": "gl-ES-RoiNeural"},
-        "RyanNeural (UK)": {"ShortName": "en-GB-RyanNeural"},
-        "SagarNeural (Nepali)": {"ShortName": "ne-NP-SagarNeural"},
-        "SalmanNeural (Urdu India)": {"ShortName": "ur-IN-SalmanNeural"},
-        "SameeraNeural (Sinhala)": {"ShortName": "si-LK-SameeraNeural"},
-        "SamNeural (Hong Kong English)": {"ShortName": "en-HK-SamNeural"},
-        "SardorNeural (Uzbek)": {"ShortName": "uz-UZ-SardorNeural"},
-        "SebastianNeural (Venezuela)": {"ShortName": "es-VE-SebastianNeural"},
-        "ShakirNeural (Egypt)": {"ShortName": "ar-EG-ShakirNeural"},
         "SteffanNeural (US)": {"ShortName": "en-US-SteffanNeural"},
-        "SreckoNeural (Croatian)": {"ShortName": "hr-HR-SreckoNeural"},
-        "SuryaNeural (Malaysian Tamil)": {"ShortName": "ta-MY-SuryaNeural"},
-        "TaimNeural (Jordan)": {"ShortName": "ar-JO-TaimNeural"},
-        "TamasNeural (Hungarian)": {"ShortName": "hu-HU-TamasNeural"},
-        "ThembaNeural (Zulu)": {"ShortName": "zu-ZA-ThembaNeural"},
+        "RyanNeural (UK)": {"ShortName": "en-GB-RyanNeural"},
         "ThomasNeural (UK)": {"ShortName": "en-GB-ThomasNeural"},
-        "ThihaNeural (Burmese)": {"ShortName": "my-MM-ThihaNeural"},
-        "ValluvarNeural (Tamil)": {"ShortName": "ta-IN-ValluvarNeural"},
-        "WanLungNeural (Cantonese)": {"ShortName": "zh-HK-WanLungNeural"},
-        "WayneNeural (Singapore English)": {"ShortName": "en-SG-WayneNeural"},
         "WilliamNeural (Australian)": {"ShortName": "en-AU-WilliamNeural"},
-        "WillemNeural (Afrikaans)": {"ShortName": "af-ZA-WillemNeural"},
-        "YunJheNeural (Taiwanese Mandarin)": {"ShortName": "zh-TW-YunJheNeural"},
+        "MitchellNeural (New Zealand)": {"ShortName": "en-NZ-MitchellNeural"},
+        "LiamNeural (Canada)": {"ShortName": "en-CA-LiamNeural"},
+        "DmitryNeural (Russian)": {"ShortName": "ru-RU-DmitryNeural"},
+        "HenriNeural (French)": {"ShortName": "fr-FR-HenriNeural"},
+        "ConradNeural (German)": {"ShortName": "de-DE-ConradNeural"},
+        "DiegoNeural (Italian)": {"ShortName": "it-IT-DiegoNeural"},
+        "JorgeNeural (Mexico)": {"ShortName": "es-MX-JorgeNeural"},
+        "AlvaroNeural (Spain)": {"ShortName": "es-ES-AlvaroNeural"},
+        "MadhurNeural (Hindi)": {"ShortName": "hi-IN-MadhurNeural"},
         "YunjianNeural (Chinese)": {"ShortName": "zh-CN-YunjianNeural"},
-        "YunxiNeural (Chinese)": {"ShortName": "zh-CN-YunxiNeural"},
-        "YunxiaNeural (Chinese)": {"ShortName": "zh-CN-YunxiaNeural"},
-        "YunyangNeural (Chinese)": {"ShortName": "zh-CN-YunyangNeural"},
+        "InJoonNeural (Korean)": {"ShortName": "ko-KR-InJoonNeural"},
     },
     "Female": {
-        "AarohiNeural (Marathi)": {"ShortName": "mr-IN-AarohiNeural"},
-        "AdriNeural (Afrikaans)": {"ShortName": "af-ZA-AdriNeural"},
-        "AigulNeural (Kazakh)": {"ShortName": "kk-KZ-AigulNeural"},
-        "AminaNeural (Algeria)": {"ShortName": "ar-DZ-AminaNeural"},
-        "AmalNeural (Qatar)": {"ShortName": "ar-QA-AmalNeural"},
-        "AmanyNeural (Syria)": {"ShortName": "ar-SY-AmanyNeural"},
-        "AnaNeural (US)": {"ShortName": "en-US-AnaNeural"},
-        "AnilaNeural (Albanian)": {"ShortName": "sq-AL-AnilaNeural"},
-        "AnuNeural (Estonian)": {"ShortName": "et-EE-AnuNeural"},
         "AriaNeural (US)": {"ShortName": "en-US-AriaNeural"},
-        "ArianeNeural (Swiss French)": {"ShortName": "fr-CH-ArianeNeural"},
-        "AsiliaNeural (Kenyan English)": {"ShortName": "en-KE-AsiliaNeural"},
-        "AthinaNeural (Greek)": {"ShortName": "el-GR-AthinaNeural"},
-        "AyshaNeural (Oman)": {"ShortName": "ar-OM-AyshaNeural"},
-        "BanuNeural (Azerbaijani)": {"ShortName": "az-AZ-BanuNeural"},
-        "BlessicaNeural (Filipino)": {"ShortName": "fil-PH-BlessicaNeural"},
-        "CamilaNeural (Peru)": {"ShortName": "es-PE-CamilaNeural"},
-        "CatalinaNeural (Chile)": {"ShortName": "es-CL-CatalinaNeural"},
-        "CharlineNeural (Belgian French)": {"ShortName": "fr-BE-CharlineNeural"},
-        "ChristelNeural (Danish)": {"ShortName": "da-DK-ChristelNeural"},
-        "ClaraNeural (Canada)": {"ShortName": "en-CA-ClaraNeural"},
-        "ColetteNeural (Dutch)": {"ShortName": "nl-NL-ColetteNeural"},
-        "DaliaNeural (Mexico)": {"ShortName": "es-MX-DaliaNeural"},
-        "DeniseNeural (French)": {"ShortName": "fr-FR-DeniseNeural"},
-        "DenaNeural (Belgian Dutch)": {"ShortName": "nl-BE-DenaNeural"},
-        "DilaraNeural (Persian)": {"ShortName": "fa-IR-DilaraNeural"},
-        "DhwaniNeural (Gujarati)": {"ShortName": "gu-IN-DhwaniNeural"},
-        "EkaNeural (Georgian)": {"ShortName": "ka-GE-EkaNeural"},
-        "ElenaNeural (Argentina)": {"ShortName": "es-AR-ElenaNeural"},
-        "EloiseNeural (French)": {"ShortName": "fr-FR-EloiseNeural"},
-        "ElsaNeural (Italian)": {"ShortName": "it-IT-ElsaNeural"},
-        "ElviraNeural (Spanish)": {"ShortName": "es-ES-ElviraNeural"},
-        "EmilyNeural (Ireland)": {"ShortName": "en-IE-EmilyNeural"},
-        "EzinneNeural (Nigeria)": {"ShortName": "en-NG-EzinneNeural"},
-        "FahedNeural (Kuwait)": {"ShortName": "ar-KW-FahedNeural"},
-        "FatimaNeural (UAE)": {"ShortName": "ar-AE-FatimaNeural"},
-        "FennaNeural (Dutch)": {"ShortName": "nl-NL-FennaNeural"},
-        "FranciscaNeural (Brazilian Portuguese)": {"ShortName": "pt-BR-FranciscaNeural"},
-        "GabrijelaNeural (Croatian)": {"ShortName": "hr-HR-GabrijelaNeural"},
-        "GadisNeural (Indonesian)": {"ShortName": "id-ID-GadisNeural"},
-        "GraceNeural (Maltese)": {"ShortName": "mt-MT-GraceNeural"},
-        "GulNeural (Urdu India)": {"ShortName": "ur-IN-GulNeural"},
-        "HilaNeural (Hebrew)": {"ShortName": "he-IL-HilaNeural"},
-        "HiuGaaiNeural (Cantonese)": {"ShortName": "zh-HK-HiuGaaiNeural"},
-        "HiuMaanNeural (Cantonese)": {"ShortName": "zh-HK-HiuMaanNeural"},
-        "HoaiMyNeural (Vietnamese)": {"ShortName": "vi-VN-HoaiMyNeural"},
-        "HsiaoChenNeural (Taiwanese Mandarin)": {"ShortName": "zh-TW-HsiaoChenNeural"},
-        "HsiaoYuNeural (Taiwanese Mandarin)": {"ShortName": "zh-TW-HsiaoYuNeural"},
-        "ImaniNeural (Tanzanian English)": {"ShortName": "en-TZ-ImaniNeural"},
-        "ImanNeural (Libya)": {"ShortName": "ar-LY-ImanNeural"},
-        "IsabellaNeural (Italian)": {"ShortName": "it-IT-IsabellaNeural"},
-        "JoanaNeural (Catalan)": {"ShortName": "ca-ES-JoanaNeural"},
         "JennyNeural (US)": {"ShortName": "en-US-JennyNeural"},
-        "KaniNeural (Malaysian Tamil)": {"ShortName": "ta-MY-KaniNeural"},
-        "KarlaNeural (Honduras)": {"ShortName": "es-HN-KarlaNeural"},
-        "KarinaNeural (Puerto Rico)": {"ShortName": "es-PR-KarinaNeural"},
-        "KalinaNeural (Bulgarian)": {"ShortName": "bg-BG-KalinaNeural"},
-        "KatjaNeural (German)": {"ShortName": "de-DE-KatjaNeural"},
-        "KeomanyNeural (Lao)": {"ShortName": "lo-LA-KeomanyNeural"},
-        "LailaNeural (Bahrain)": {"ShortName": "ar-BH-LailaNeural"},
-        "LatifaNeural (Pashto)": {"ShortName": "ps-AF-LatifaNeural"},
-        "LaylaNeural (Lebanon)": {"ShortName": "ar-LB-LaylaNeural"},
-        "LeahNeural (South Africa)": {"ShortName": "en-ZA-LeahNeural"},
-        "LibbyNeural (UK)": {"ShortName": "en-GB-LibbyNeural"},
-        "LenaNeural (Swiss German)": {"ShortName": "de-CH-LeniNeural"},
-        "LorenaNeural (El Salvador)": {"ShortName": "es-SV-LorenaNeural"},
-        "LunaNeural (Singapore English)": {"ShortName": "en-SG-LunaNeural"},
-        "MarijaNeural (Macedonian)": {"ShortName": "mk-MK-MarijaNeural"},
-        "MartaNeural (Guatemala)": {"ShortName": "es-GT-MartaNeural"},
-        "MaryamNeural (Yemen)": {"ShortName": "ar-YE-MaryamNeural"},
-        "MaisieNeural (UK)": {"ShortName": "en-GB-MaisieNeural"},
-        "MekdesNeural (Amharic)": {"ShortName": "am-ET-MekdesNeural"},
         "MichelleNeural (US)": {"ShortName": "en-US-MichelleNeural"},
-        "MollyNeural (New Zealand)": {"ShortName": "en-NZ-MollyNeural"},
-        "MounaNeural (Morocco)": {"ShortName": "ar-MA-MounaNeural"},
-        "NabanitaNeural (Bangla)": {"ShortName": "bn-BD-NabanitaNeural"},
-        "NanamiNeural (Japanese)": {"ShortName": "ja-JP-NanamiNeural"},
-        "NatashaNeural (Australian)": {"ShortName": "en-AU-NatashaNeural"},
-        "NeerjaNeural (Indian English)": {"ShortName": "en-IN-NeerjaNeural"},
-        "NiaNeural (Welsh)": {"ShortName": "cy-GB-NiaNeural"},
-        "NilarNeural (Burmese)": {"ShortName": "my-MM-NilarNeural"},
-        "NoemiNeural (Hungarian)": {"ShortName": "hu-HU-NoemiNeural"},
-        "NooraNeural (Finnish)": {"ShortName": "fi-FI-NooraNeural"},
-        "NouraNeural (Kuwait)": {"ShortName": "ar-KW-NouraNeural"},
-        "OnaNeural (Lithuanian)": {"ShortName": "lt-LT-OnaNeural"},
-        "PallaviNeural (Tamil)": {"ShortName": "ta-IN-PallaviNeural"},
-        "PalomaNeural (US Spanish)": {"ShortName": "es-US-PalomaNeural"},
-        "PaolaNeural (Venezuela)": {"ShortName": "es-VE-PaolaNeural"},
-        "PetraNeural (Slovenian)": {"ShortName": "sl-SI-PetraNeural"},
-        "PolinaNeural (Ukrainian)": {"ShortName": "uk-UA-PolinaNeural"},
-        "PernilleNeural (Norwegian)": {"ShortName": "nb-NO-PernilleNeural"},
-        "PremwadeeNeural (Thai)": {"ShortName": "th-TH-PremwadeeNeural"},
-        "RaquelNeural (Portuguese)": {"ShortName": "pt-PT-RaquelNeural"},
-        "ReemNeural (Tunisia)": {"ShortName": "ar-TN-ReemNeural"},
-        "RehemaNeural (Swahili Tanzania)": {"ShortName": "sw-TZ-RehemaNeural"},
-        "RosaNeural (Philippine English)": {"ShortName": "en-PH-RosaNeural"},
-        "SalmaNeural (Egypt)": {"ShortName": "ar-EG-SalmaNeural"},
-        "SalomeNeural (Colombia)": {"ShortName": "es-CO-SalomeNeural"},
-        "SanaNeural (Jordan)": {"ShortName": "ar-JO-SanaNeural"},
-        "SabelaNeural (Galician)": {"ShortName": "gl-ES-SabelaNeural"},
-        "SapnaNeural (Kannada)": {"ShortName": "kn-IN-SapnaNeural"},
-        "SaranyaNeural (Sri Lanka Tamil)": {"ShortName": "ta-LK-SaranyaNeural"},
-        "ShrutiNeural (Telugu)": {"ShortName": "te-IN-ShrutiNeural"},
-        "SitiNeural (Javanese)": {"ShortName": "jv-ID-SitiNeural"},
-        "SobhanaNeural (Malayalam)": {"ShortName": "ml-IN-SobhanaNeural"},
-        "SofieNeural (Swedish)": {"ShortName": "sv-SE-SofieNeural"},
+        "AnaNeural (US)": {"ShortName": "en-US-AnaNeural"},
+        "LibbyNeural (UK)": {"ShortName": "en-GB-LibbyNeural"},
         "SoniaNeural (UK)": {"ShortName": "en-GB-SoniaNeural"},
-        "SophieNeural (Serbian)": {"ShortName": "sr-RS-SophieNeural"},
-        "SunHiNeural (Korean)": {"ShortName": "ko-KR-SunHiNeural"},
-        "SvetlanaNeural (Russian)": {"ShortName": "ru-RU-SvetlanaNeural"},
+        "MaisieNeural (UK)": {"ShortName": "en-GB-MaisieNeural"},
+        "NatashaNeural (Australian)": {"ShortName": "en-AU-NatashaNeural"},
+        "MollyNeural (New Zealand)": {"ShortName": "en-NZ-MollyNeural"},
+        "ClaraNeural (Canada)": {"ShortName": "en-CA-ClaraNeural"},
+        "DeniseNeural (French)": {"ShortName": "fr-FR-DeniseNeural"},
+        "KatjaNeural (German)": {"ShortName": "de-DE-KatjaNeural"},
+        "ElsaNeural (Italian)": {"ShortName": "it-IT-ElsaNeural"},
+        "DaliaNeural (Mexico)": {"ShortName": "es-MX-DaliaNeural"},
+        "ElviraNeural (Spanish)": {"ShortName": "es-ES-ElviraNeural"},
         "SwaraNeural (Hindi)": {"ShortName": "hi-IN-SwaraNeural"},
-        "TanishaaNeural (Bengali)": {"ShortName": "bn-IN-TanishaaNeural"},
-        "TaniaNeural (Paraguay)": {"ShortName": "es-PY-TaniaNeural"},
-        "TeresaNeural (Equatorial Guinea)": {"ShortName": "es-GQ-TeresaNeural"},
-        "ThandoNeural (Zulu)": {"ShortName": "zu-ZA-ThandoNeural"},
-        "ThiliniNeural (Sinhala)": {"ShortName": "si-LK-ThiliniNeural"},
-        "TutiNeural (Sundanese)": {"ShortName": "su-ID-TutiNeural"},
-        "UzmaNeural (Urdu Pakistan)": {"ShortName": "ur-PK-UzmaNeural"},
-        "ValentinaNeural (Uruguay)": {"ShortName": "es-UY-ValentinaNeural"},
-        "VenbaNeural (Singapore Tamil)": {"ShortName": "ta-SG-VenbaNeural"},
-        "VesnaNeural (Bosnian)": {"ShortName": "bs-BA-VesnaNeural"},
-        "ViktoriaNeural (Slovak)": {"ShortName": "sk-SK-ViktoriaNeural"},
-        "VlastaNeural (Czech)": {"ShortName": "cs-CZ-VlastaNeural"},
-        "XiaobeiNeural (Liaoning Mandarin)": {"ShortName": "zh-CN-liaoning-XiaobeiNeural"},
-        "XiaoniNeural (Shaanxi Mandarin)": {"ShortName": "zh-CN-shaanxi-XiaoniNeural"},
         "XiaoxiaoNeural (Chinese)": {"ShortName": "zh-CN-XiaoxiaoNeural"},
-        "XiaoyiNeural (Chinese)": {"ShortName": "zh-CN-XiaoyiNeural"},
-        "YanNeural (Hong Kong English)": {"ShortName": "en-HK-YanNeural"},
-        "YasminNeural (Malay)": {"ShortName": "ms-MY-YasminNeural"},
-        "YesuiNeural (Mongolian)": {"ShortName": "mn-MN-YesuiNeural"},
-        "ZariyahNeural (Saudi Arabia)": {"ShortName": "ar-SA-ZariyahNeural"},
-        "ZofiaNeural (Polish)": {"ShortName": "pl-PL-ZofiaNeural"},
-        "ZuriNeural (Swahili Kenya)": {"ShortName": "sw-KE-ZuriNeural"},
+        "SunHiNeural (Korean)": {"ShortName": "ko-KR-SunHiNeural"},
+        "NanamiNeural (Japanese)": {"ShortName": "ja-JP-NanamiNeural"},
+        "BlessicaNeural (Filipino)": {"ShortName": "fil-PH-BlessicaNeural"},
     },
 }
 
@@ -604,12 +285,12 @@ voices_by_gender = {
 async def text_to_speech(text, filename, character):
     communicate = edge_tts.Communicate(text, character)
     await communicate.save(filename)
-    return filename  # Return filename after saving
+    return filename
 
 
 def tetos():
     st.subheader("TeTos by Elley")
-    st.title("Free Online Text-To-Speech Tool ")
+    st.title("Free Online Text-To-Speech Tool")
     content_prompt = st.text_area("Prompt", "", height=150)
     selected_voice = st.segmented_control('Gender', ['Male', 'Female'], selection_mode="single")
     voice_final = None
@@ -623,58 +304,51 @@ def tetos():
         else:
             with st.spinner("Generating your voice..."):
                 filename = "voice.mp3"
-                # Run the async function properly
                 voice_arranged = voices_by_gender[selected_voice][voice_final]["ShortName"]
                 asyncio.run(text_to_speech(content_prompt, filename, voice_arranged))
-                # Open the saved file and pass bytes to st.audio
                 with open(filename, "rb") as f:
                     audio_bytes = f.read()
                 st.audio(audio_bytes, format="audio/mpeg", loop=True)
 
 
+# ─────────────────────────────────────────────────────────────
+#  AITO CHATBOT
+# ─────────────────────────────────────────────────────────────
 def aito():
-
-
     st.title("AITO")
     st.caption("AI TOol for General Purpose")
-
-    # Initialize chat history
     if "messages" not in st.session_state:
         st.session_state.messages = [
             {"role": "system", "content": "You shall be named AITO a general AI TOol"}
         ]
-
-    # Display chat messages from history
     for msg in st.session_state.messages:
-        if msg["role"] != "system":  # Don't display system messages
+        if msg["role"] != "system":
             st.chat_message(msg["role"]).write(msg["content"])
-
-    # Accept user input
     if prompt := st.chat_input():
-        # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.chat_message("user").write(prompt)
-
-        # Get AI response with full conversation history
         response = ai_assistant(st.session_state.messages, rule=None)
-
         if response:
-            # Add AI response to chat history
             st.session_state.messages.append({"role": "assistant", "content": response})
             st.chat_message("assistant").write(response)
 
+
+# ─────────────────────────────────────────────────────────────
+#  PDF HELPERS
+# ─────────────────────────────────────────────────────────────
 def extract_pdf_text(pdf_file: str) -> str:
     try:
         reader = PyPDF2.PdfReader(pdf_file)
         pdf_text = []
         for page in reader.pages:
             content = page.extract_text()
-            if content:  # Only add if text was extracted
+            if content:
                 pdf_text.append(content)
         return "\n".join(pdf_text) if pdf_text else "No text could be extracted from the PDF."
     except Exception as f:
         st.error(f"Error reading PDF: {str(f)}")
         return None
+
 
 def extract_pptx_text(pptx_file):
     try:
@@ -694,8 +368,10 @@ def extract_pptx_text(pptx_file):
         return None
 
 
+# ─────────────────────────────────────────────────────────────
+#  PDF TO QUIZ
+# ─────────────────────────────────────────────────────────────
 def pdf2quiz():
-    # System prompts for different quiz types
     system_condition_mcq = """You are a system only for creating multiple choice quiz python dictionaries. 
                         Return ONLY a properly formatted Python dictionary with no additional text or explanation.
                         Format:
@@ -710,7 +386,6 @@ def pdf2quiz():
                             },
                             ...
                         }"""
-
     system_condition_open = """You are a system only for creating open-ended quiz python dictionaries. 
                         Return ONLY a properly formatted Python dictionary with no additional text or explanation.
                         Format:
@@ -722,21 +397,8 @@ def pdf2quiz():
                                 "scoring_criteria": ["Key point 1", "Key point 2", "Key point 3"]
                             },
                             ...
-                        }
-                        Important rules:
-                        1. ALWAYS include a detailed model_answer (minimum 3 sentences)
-                        2. Include 3-5 specific scoring_criteria
-                        3. Questions should require paragraph-length responses
-                        4. Model answers must be directly based on provided content"""
-
-    scoring_system = """You are an expert grader. Analyze the student's answer and provide:
-    1. Score (1-10)
-    2. Detailed explanation justifying the score
-    3. Specific feedback
-    4. List of matched concepts
-    5. List of missing elements
-
-    Return ONLY this format:
+                        }"""
+    scoring_system = """You are an expert grader. Return ONLY this format:
     {
         "score": [1-10],
         "explanation": "Paragraph analyzing strengths/weaknesses",
@@ -745,54 +407,30 @@ def pdf2quiz():
         "missing_points": ["list", "of", "missing", "elements"]
     }"""
 
-    # Initialize session state
     if 'quiz' not in st.session_state:
         st.session_state.quiz = {
-            'data': None,
-            'answers': {},
-            'submitted': False,
-            'file_processed': None,
-            'file_type': None,
-            'quiz_type': 'multiple_choice',
-            'scores': {},
-            'custom_topic': None
+            'data': None, 'answers': {}, 'submitted': False,
+            'file_processed': None, 'file_type': None,
+            'quiz_type': 'multiple_choice', 'scores': {}, 'custom_topic': None
         }
 
     st.title("📝 Smart Quiz Generator")
     st.subheader("Create quizzes from files or custom topics")
 
-    # Quiz type selection
-    quiz_type = st.radio(
-        "Quiz Type",
-        options=["Multiple Choice", "Open-Ended"],
-        key="quiz_type_selector"
-    )
+    quiz_type = st.radio("Quiz Type", options=["Multiple Choice", "Open-Ended"], key="quiz_type_selector")
     st.session_state.quiz['quiz_type'] = 'multiple_choice' if quiz_type == "Multiple Choice" else 'open_ended'
 
-    # Content source selection
-    content_source = st.radio(
-        "Content Source",
-        options=["Upload File", "Custom Topic"],
-        horizontal=True,
-        key="content_source"
-    )
+    content_source = st.radio("Content Source", options=["Upload File", "Custom Topic"], horizontal=True, key="content_source")
 
     if content_source == "Upload File":
         uploaded_file = st.file_uploader("Upload PDF or PPTX", type=["pdf", "pptx"])
         custom_topic = None
     else:
-        custom_topic = st.text_area(
-            "Enter your custom topic/subject:",
-            placeholder="e.g., Machine Learning, World War II, Python Programming...",
-            key="custom_topic"
-        )
+        custom_topic = st.text_area("Enter your custom topic/subject:", placeholder="e.g., Machine Learning...", key="custom_topic")
         uploaded_file = None
         st.session_state.quiz['custom_topic'] = custom_topic
 
-    number_quiz = st.number_input(
-        "Number of questions to generate",
-        min_value=1, max_value=100, value=6
-    )
+    number_quiz = st.number_input("Number of questions", min_value=1, max_value=100, value=6)
     content_prompt = st.text_area("Extra Prompt", "", height=90)
 
     if st.button("Generate Quiz", type="primary"):
@@ -805,21 +443,15 @@ def pdf2quiz():
                     with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
                         tmp_file.write(uploaded_file.getvalue())
                         tmp_file_path = tmp_file.name
+                    extracted_text = extract_pdf_text(tmp_file_path) if uploaded_file.name.endswith('.pdf') else extract_pptx_text(tmp_file_path)
 
-                    extracted_text = extract_pdf_text(tmp_file_path) if uploaded_file.name.endswith(
-                        '.pdf') else extract_pptx_text(tmp_file_path)
-
-                full_prompt = f"""Create {number_quiz} {'multiple choice' if st.session_state.quiz['quiz_type'] == 'multiple_choice' else 'open-ended'} questions. Additional info to consider
-                : {content_prompt}
-                """
-
+                full_prompt = f"Create {number_quiz} {'multiple choice' if st.session_state.quiz['quiz_type'] == 'multiple_choice' else 'open-ended'} questions. Additional info: {content_prompt}"
                 if custom_topic:
                     full_prompt += f" about: {custom_topic}"
                 if extracted_text and not extracted_text.startswith("No text"):
                     full_prompt += f"\nText content: {extracted_text[:10000]}"
 
-                system_prompt = system_condition_mcq if st.session_state.quiz[
-                                                            'quiz_type'] == 'multiple_choice' else system_condition_open
+                system_prompt = system_condition_mcq if st.session_state.quiz['quiz_type'] == 'multiple_choice' else system_condition_open
                 content_out = ai_assistant(full_prompt, system_prompt)
 
                 if content_out:
@@ -830,85 +462,44 @@ def pdf2quiz():
                             if clean_output.startswith(("python", "json")):
                                 clean_output = clean_output[6:].strip()
                         clean_output = clean_output.strip().strip('"').strip("'")
-
-                        # Ensure valid JSON format
                         if not clean_output.endswith('}'):
                             clean_output += '}'
-
                         quiz_data = ast.literal_eval(clean_output)
-
-                        if st.session_state.quiz['quiz_type'] == 'open_ended':
-                            for q_num, question in quiz_data.items():
-                                if 'model_answer' not in question or len(question['model_answer'].split()) < 15:
-                                    question['model_answer'] = ai_assistant(
-                                        f"Create detailed model answer for: {question['question']}\nContent: {extracted_text[:5000] if extracted_text else custom_topic}",
-                                        "Create perfect model answers (minimum 3 sentences)"
-                                    ) or "No model answer generated"
-                                if 'scoring_criteria' not in question or len(question['scoring_criteria']) < 3:
-                                    question['scoring_criteria'] = ast.literal_eval(
-                                        ai_assistant(
-                                            f"Create 3-5 scoring criteria for: {question['question']}\nModel Answer: {question.get('model_answer', '')}",
-                                            "You create specific scoring criteria"
-                                        ) or "[]"
-                                    )
-
                         st.session_state.quiz.update({
                             'data': quiz_data,
                             'answers': {q_num: None for q_num in quiz_data},
                             'file_processed': uploaded_file,
-                            'file_type': "PDF" if uploaded_file and uploaded_file.name.endswith(
-                                '.pdf') else "PPTX" if uploaded_file else "Custom Topic",
-                            'scores': {},
-                            'submitted': False
+                            'file_type': "PDF" if uploaded_file and uploaded_file.name.endswith('.pdf') else "PPTX" if uploaded_file else "Custom Topic",
+                            'scores': {}, 'submitted': False
                         })
                         st.rerun()
-
                     except Exception as e:
                         st.error(f"Error processing quiz: {str(e)}")
                         st.code(content_out)
 
-    # Quiz display and interaction
     if st.session_state.quiz['data']:
         st.divider()
-        st.subheader(f"{quiz_type} Quiz Generated from {st.session_state.quiz.get('file_type', 'Custom Topic')}")
-        if st.session_state.quiz['file_processed']:
-            st.write(f"File: {st.session_state.quiz['file_processed'].name}")
-        elif st.session_state.quiz['custom_topic']:
-            st.write(f"Topic: {st.session_state.quiz['custom_topic']}")
-
+        st.subheader(f"{quiz_type} Quiz")
         all_answered = True
         for q_num, question in st.session_state.quiz['data'].items():
             st.markdown(f"### Question {q_num}")
             st.write(question['question'])
-
             if st.session_state.quiz['quiz_type'] == 'multiple_choice':
                 options = [question['a'], question['b'], question['c'], question['d']]
                 current_answer = st.session_state.quiz['answers'].get(q_num)
-                user_choice = st.radio(
-                    "Select your answer:",
-                    options,
-                    key=f"q_{q_num}_mcq",
-                    index=options.index(current_answer) if current_answer in options else None
-                )
+                user_choice = st.radio("Select your answer:", options, key=f"q_{q_num}_mcq",
+                                       index=options.index(current_answer) if current_answer in options else None)
                 if user_choice != current_answer:
                     st.session_state.quiz['answers'][q_num] = user_choice
                     st.rerun()
             else:
                 current_answer = st.session_state.quiz['answers'].get(q_num, "")
-                user_answer = st.text_area(
-                    "Your answer:",
-                    value=current_answer,
-                    key=f"q_{q_num}_open",
-                    height=150
-                )
+                user_answer = st.text_area("Your answer:", value=current_answer, key=f"q_{q_num}_open", height=150)
                 if user_answer != current_answer:
                     st.session_state.quiz['answers'][q_num] = user_answer
                     st.rerun()
-
             if st.session_state.quiz['answers'].get(q_num) is None:
                 all_answered = False
-
-            # Display feedback only after submission
             if st.session_state.quiz['submitted']:
                 if st.session_state.quiz['quiz_type'] == 'multiple_choice':
                     correct_answer = question[question['answer_key']]
@@ -918,28 +509,13 @@ def pdf2quiz():
                         st.error(f"✗ Incorrect. The correct answer is: {correct_answer}")
                 else:
                     score_data = st.session_state.quiz['scores'].get(q_num, {})
-
-                    # Score display
                     st.markdown(f"**Score:** {score_data.get('score', 0)}/10")
-
-                    # Explanation expander
-                    with st.expander("📝 Detailed Feedback", expanded=False):
+                    with st.expander("📝 Detailed Feedback"):
                         st.write(score_data.get('explanation', 'No explanation available'))
-                        if 'feedback' in score_data:
-                            st.markdown("**Suggestions for improvement:**")
-                            st.write(score_data['feedback'])
-
-                    # Model answer expander
-                    with st.expander("📚 Model Answer & Criteria", expanded=False):
-                        st.markdown("**Scoring Criteria:**")
-                        for criterion in question.get('scoring_criteria', []):
-                            st.markdown(f"- {criterion}")
-                        st.markdown("**Model Answer:**")
+                    with st.expander("📚 Model Answer"):
                         st.write(question.get('model_answer', 'Not available'))
-
             st.markdown("---")
 
-        # Submission and reset buttons
         col1, col2 = st.columns(2)
         with col1:
             if not st.session_state.quiz['submitted'] and st.button("Submit Answers", disabled=not all_answered):
@@ -948,96 +524,47 @@ def pdf2quiz():
                         scores = {}
                         for q_num, question in st.session_state.quiz['data'].items():
                             user_answer = st.session_state.quiz['answers'][q_num]
-
                             if not user_answer or len(user_answer.strip()) < 10:
-                                scores[q_num] = {
-                                    "score": 1,
-                                    "explanation": "Answer too short or empty",
-                                    "feedback": "Please provide a more detailed answer (minimum 2-3 sentences)",
-                                    "key_matches": [],
-                                    "missing_points": ["Substantial content", "Key concepts"]
-                                }
+                                scores[q_num] = {"score": 1, "explanation": "Answer too short", "feedback": "Provide more detail", "key_matches": [], "missing_points": []}
                                 continue
-
-                            prompt = f"""
-                            Evaluate this answer against the model:
-                            Question: {question['question']}
-                            Model Answer: {question.get('model_answer', '')}
-                            Scoring Criteria: {question.get('scoring_criteria', [])}
-                            Student Answer: {user_answer}
-
-                            Return ONLY this format:
-                            {{
-                                "score": [1-10],
-                                "explanation": "Detailed analysis",
-                                "feedback": "Specific improvements",
-                                "key_matches": ["matched", "concepts"],
-                                "missing_points": ["missing", "elements"]
-                            }}
-                            """
-
+                            prompt = f"Question: {question['question']}\nModel: {question.get('model_answer','')}\nStudent: {user_answer}"
                             try:
                                 score_data = ai_assistant(prompt, scoring_system)
                                 clean_data = score_data.strip().strip('```').strip()
                                 scores[q_num] = json.loads(clean_data)
-                            except Exception as e:
-                                scores[q_num] = {
-                                    "score": 5,
-                                    "explanation": "Automated evaluation failed",
-                                    "feedback": "Compare your answer with the model answer",
-                                    "key_matches": [],
-                                    "missing_points": []
-                                }
-
+                            except:
+                                scores[q_num] = {"score": 5, "explanation": "Evaluation failed", "feedback": "Compare with model answer", "key_matches": [], "missing_points": []}
                         st.session_state.quiz['scores'] = scores
                 st.session_state.quiz['submitted'] = True
                 st.rerun()
-
         with col2:
             if st.button("Reset Quiz"):
-                st.session_state.quiz = {
-                    'data': None,
-                    'answers': {},
-                    'submitted': False,
-                    'file_processed': None,
-                    'file_type': None,
-                    'quiz_type': 'multiple_choice',
-                    'scores': {},
-                    'custom_topic': None
-                }
+                st.session_state.quiz = {'data': None, 'answers': {}, 'submitted': False, 'file_processed': None, 'file_type': None, 'quiz_type': 'multiple_choice', 'scores': {}, 'custom_topic': None}
                 st.rerun()
 
-        # Display total score after submission
         if st.session_state.quiz['submitted']:
             st.divider()
             if st.session_state.quiz['quiz_type'] == 'multiple_choice':
-                correct = sum(
-                    1 for q_num, question in st.session_state.quiz['data'].items()
-                    if st.session_state.quiz['answers'][q_num] == question[question['answer_key']]
-                )
-                st.success(
-                    f"🎯 Your score: {correct}/{len(st.session_state.quiz['data'])} ({correct / len(st.session_state.quiz['data']) * 100:.1f}%)")
+                correct = sum(1 for q_num, question in st.session_state.quiz['data'].items()
+                              if st.session_state.quiz['answers'][q_num] == question[question['answer_key']])
+                st.success(f"🎯 Your score: {correct}/{len(st.session_state.quiz['data'])} ({correct/len(st.session_state.quiz['data'])*100:.1f}%)")
             else:
                 total = sum(score['score'] for score in st.session_state.quiz['scores'].values())
                 max_score = 10 * len(st.session_state.quiz['data'])
-                st.success(f"🎯 Total Score: {total}/{max_score} ({total / max_score * 100:.1f}%)")
+                st.success(f"🎯 Total Score: {total}/{max_score} ({total/max_score*100:.1f}%)")
 
 
+# ─────────────────────────────────────────────────────────────
+#  ORIGINALITY CHECKER
+# ─────────────────────────────────────────────────────────────
 def extract_text_from_file(uploaded_file):
-    """Extract text from uploaded file based on its type."""
     text = ""
     try:
         if uploaded_file.name.endswith('.pdf'):
             reader = PyPDF2.PdfReader(uploaded_file)
             text = "\n".join([page.extract_text() for page in reader.pages if page.extract_text()])
-        elif uploaded_file.name.endswith('.docx'):
-            doc = Document(uploaded_file)
-            text = "\n".join([para.text for para in doc.paragraphs])
         elif uploaded_file.name.endswith('.txt'):
             text = uploaded_file.read().decode('utf-8')
-        elif uploaded_file.name.endswith('.pptx'):
-            prs = Presentation(uploaded_file)
-            text = "\n".join([shape.text for slide in prs.slides for shape in slide.shapes if hasattr(shape, "text")])
     except Exception as e:
         st.error(f"Error extracting text: {str(e)}")
     return text
@@ -1046,25 +573,19 @@ def extract_text_from_file(uploaded_file):
 def turnitin_knockoff():
     st.title("🔍 Originality Checker")
     st.caption("Academic integrity analysis inspired by Turnitin")
-
-    # Input options - text or file or URL
-    input_method = st.radio("Input Method",
-                            ["Text Input", "File Upload", "Website URL"],
-                            horizontal=True)
-
+    input_method = st.radio("Input Method", ["Text Input", "File Upload", "Website URL"], horizontal=True)
     text = ""
     if input_method == "Text Input":
         text = st.text_area("Enter text to analyze", height=200)
     elif input_method == "File Upload":
-        uploaded_file = st.file_uploader("Upload document to analyze",
-                                         type=["pdf", "docx", "pptx", "txt"])
+        uploaded_file = st.file_uploader("Upload document", type=["pdf", "docx", "pptx", "txt"])
         if uploaded_file:
             with st.spinner("Extracting text..."):
                 text = extract_text_from_file(uploaded_file)
-    else:  # Website URL
-        url = st.text_input("Enter website URL to analyze")
+    else:
+        url = st.text_input("Enter website URL")
         if url:
-            with st.spinner("Extracting text from website..."):
+            with st.spinner("Fetching website..."):
                 try:
                     response = requests.get(url)
                     soup = BeautifulSoup(response.text, 'html.parser')
@@ -1076,365 +597,430 @@ def turnitin_knockoff():
         st.warning("No text found to analyze")
         return
 
-    # Display basic stats
-    word_count = len(text.split())
-    st.metric("Word Count", word_count)
-
-    # Analysis options
-    analysis_type = st.radio("Analysis Mode",
-                             ["Quick Check", "Deep Analysis"],
-                             horizontal=True)
-
-    # Determine analysis depth based on selection
+    st.metric("Word Count", len(text.split()))
+    analysis_type = st.radio("Analysis Mode", ["Quick Check", "Deep Analysis"], horizontal=True)
     analysis_depth = 3000 if analysis_type == "Quick Check" else 10000
 
     if st.button("Run Originality Check"):
         with st.spinner("Analyzing content..."):
-            # AI Detection Analysis
             st.subheader("🤖 AI Detection Score")
-            try:
-                ai_prompt = f"""Analyze this text for AI-generated patterns:
-                {text[:analysis_depth]}
-
-                Return ONLY a JSON object with these keys:
-                - "score": number between 0-100
-                - "flagged_passages": list of [phrase, score] pairs
-                - "explanation": string explanation
-                - make sure that the analysis is based from the whole text and not focusing in a single sentence or phrases to prevent false positives or systematic errors in calculating.
-
-                Example response:
-                {{
-                    "score": 75,
-                    "flagged_passages": [
-                        ["This is a sample phrase", 80],
-                        ["Another example text", 65]
-                    ],
-                    "explanation": "The text shows patterns common in AI-generated content"
-                }}
-                """
-
-                ai_result = ai_assistant(ai_prompt, "You are an AI content detector. Return ONLY valid JSON.")
-                if not ai_result:
-                    raise ValueError("No response received from AI assistant")
-
+            ai_prompt = f"""Analyze this text for AI-generated patterns: {text[:analysis_depth]}
+Return ONLY a JSON object: {{"score": 0-100, "flagged_passages": [["phrase", score], ...], "explanation": "string"}}"""
+            ai_result = ai_assistant(ai_prompt, "You are an AI content detector. Return ONLY valid JSON.")
+            if ai_result:
                 try:
-                    # Clean the response by removing potential markdown code blocks
-                    clean_result = ai_result.strip()
-                    if clean_result.startswith("```json"):
-                        clean_result = clean_result[7:]
-                    if clean_result.startswith("```"):
-                        clean_result = clean_result[3:]
-                    if clean_result.endswith("```"):
-                        clean_result = clean_result[:-3]
-
-                    ai_data = json.loads(clean_result)
-
-                    # Validate required fields
-                    required_fields = ["score", "flagged_passages", "explanation"]
-                    for field in required_fields:
-                        if field not in ai_data:
-                            raise ValueError(f"Missing required field: {field}")
-
-                    # Display results
+                    clean = ai_result.strip().lstrip("```json").lstrip("```").rstrip("```")
+                    ai_data = json.loads(clean)
                     st.progress(ai_data["score"] / 100)
                     st.metric("AI Likelihood Score", f"{ai_data['score']}%")
-
-                    # Annotated text display
-                    annotated_text = text
-                    for passage in ai_data["flagged_passages"]:
-                        if isinstance(passage, (list, tuple)) and len(passage) == 2:
-                            phrase, score = passage
-                            if isinstance(phrase, str) and phrase in annotated_text:
-                                color = "#ffcccc" if score > 70 else "#ffe6cc" if score > 40 else "#ffffcc"
-                                annotated_text = annotated_text.replace(
-                                    phrase,
-                                    f'<span style="background-color: {color}">{phrase}</span>'
-                                )
-
-                    with st.expander("Annotated Text (AI Detection)"):
-                        st.markdown(annotated_text, unsafe_allow_html=True)
-
-                    with st.expander("Detailed AI Analysis"):
-                        for passage in ai_data["flagged_passages"]:
-                            if isinstance(passage, (list, tuple)) and len(passage) == 2:
-                                st.markdown(f"- `{passage[0]}` (AI likelihood: {passage[1]}%)")
-                        st.caption(ai_data["explanation"])
-
+                    with st.expander("AI Analysis Details"):
+                        st.caption(ai_data.get("explanation", ""))
                 except Exception as e:
-                    st.error(f"Error processing AI analysis: {str(e)}")
-                    st.text_area("Raw AI Response", value=ai_result, height=200)
+                    st.error(f"Error: {str(e)}")
 
-            except Exception as e:
-                st.error(f"AI Detection analysis failed: {str(e)}")
-
-            # Plagiarism Analysis
-            st.subheader("🔗 External Similarity (Plagiarism Check)")
-            try:
-                plag_prompt = f"""Analyze this text for potential plagiarism:
-                {text[:analysis_depth]}
-
-                Return ONLY a JSON object with these keys:
-                - "plagiarism_score": number between 0-100
-                - "potential_sources": list of dictionaries with:
-                    - "phrase": the matching text segment
-                    - "source": website URL where similar content was found
-                    - "similarity_score": estimated similarity percentage (0-100)
-                - "suggestions": string with improvement recommendations
-                - make sure that the analysis is based from the whole text and not focusing in a single sentence or phrases to prevent false positives or systematic errors in calculating.
-                total score must be based on the overall text given.
-                Example response:
-                {{
-                    "plagiarism_score": 60,
-                    "potential_sources": [
-                        {{
-                            "phrase": "sample text", 
-                            "source": "https://example.com/article1", 
-                            "similarity_score": 85
-                        }},
-                        {{
-                            "phrase": "another phrase", 
-                            "source": "https://sample.org/research", 
-                            "similarity_score": 72
-                        }}
-                    ],
-                    "suggestions": "Consider rephrasing these passages"
-                }}
-                """
-
-                plag_result = ai_assistant(plag_prompt, "You are a plagiarism detector. Return ONLY valid JSON.")
-                if not plag_result:
-                    raise ValueError("No response received from AI assistant")
-
-                try:
-                    # Clean the response
-                    clean_result = plag_result.strip()
-                    if clean_result.startswith("```json"):
-                        clean_result = clean_result[7:]
-                    if clean_result.startswith("```"):
-                        clean_result = clean_result[3:]
-                    if clean_result.endswith("```"):
-                        clean_result = clean_result[:-3]
-
-                    plag_data = json.loads(clean_result)
-
-                    # Validate required fields
-                    required_fields = ["plagiarism_score", "potential_sources", "suggestions"]
-                    for field in required_fields:
-                        if field not in plag_data:
-                            raise ValueError(f"Missing required field: {field}")
-
-                    # Display results
-                    st.progress(plag_data["plagiarism_score"] / 100)
-                    st.metric("Plagiarism Risk Score", f"{plag_data['plagiarism_score']}%")
-
-                    # Annotated text display with clickable links
-                    if isinstance(plag_data["potential_sources"], list):
-                        plag_annotated = text
-                        sources_by_phrase = {}
-
-                        for item in plag_data["potential_sources"]:
-                            if isinstance(item, dict) and "phrase" in item and "source" in item:
-                                phrase = item["phrase"]
-                                source = item["source"]
-                                similarity = item.get("similarity_score", 0)
-
-                                # Store sources for each phrase
-                                if phrase not in sources_by_phrase:
-                                    sources_by_phrase[phrase] = []
-                                sources_by_phrase[phrase].append((source, similarity))
-
-                                # Highlight in text
-                                if isinstance(phrase, str) and phrase in plag_annotated:
-                                    plag_annotated = plag_annotated.replace(
-                                        phrase,
-                                        f'<span style="background-color: #ffcccc" title="Potential source: {source} (Similarity: {similarity}%)">{phrase}</span>'
-                                    )
-
-                        with st.expander("Annotated Text (Plagiarism Check)"):
-                            st.markdown(plag_annotated, unsafe_allow_html=True)
-
-                        with st.expander("Potential Sources (Click to Visit)"):
-                            # Group sources by phrase
-                            for phrase, sources in sources_by_phrase.items():
-                                st.markdown(f"**Phrase:** `{phrase}`")
-
-                                # Sort sources by similarity score
-                                sources.sort(key=lambda x: x[1], reverse=True)
-
-                                for source, similarity in sources[:3]:  # Show top 3 sources per phrase
-                                    # Clean up URL for display
-                                    display_url = source.replace("https://", "").replace("http://", "").split("/")[0]
-
-                                    # Create clickable link
-                                    st.markdown(
-                                        f"- Similarity: {similarity}% | "
-                                        f"[{display_url}]({source})",
-                                        unsafe_allow_html=True
-                                    )
-                                st.markdown("---")
-
-                    st.info("Suggestions: " + plag_data["suggestions"])
-
-                except Exception as e:
-                    st.error(f"Error processing plagiarism analysis: {str(e)}")
-                    st.text_area("Raw Plagiarism Response", value=plag_result, height=200)
-
-            except Exception as e:
-                st.error(f"Plagiarism analysis failed: {str(e)}")
-
-            # Self-Similarity Analysis
             st.subheader("📝 Internal Similarity")
-            try:
-                sim_prompt = f"""Analyze this document's self-similarity:
-                {text[:analysis_depth]}
-
-                Return ONLY a JSON object with these keys:
-                - "repetition_score": number between 0-100
-                - "most_repeated_phrases": list of {{"phrase": string, "count": number}}
-                - "suggestions": string
-                - make sure that the analysis is based from the whole text and not focusing in a single sentence or phrases to prevent false positives or systematic errors in calculating.
-                total score must be based on the overall text given.
-                Example response:
-                {{
-                    "repetition_score": 45,
-                    "most_repeated_phrases": [
-                        {{"phrase": "common phrase", "count": 5}},
-                        {{"phrase": "another phrase", "count": 3}}
-                    ],
-                    "suggestions": "Try varying your word choice"
-                }}
-                """
-
-                sim_result = ai_assistant(sim_prompt, "You analyze text repetition. Return ONLY valid JSON.")
-                if not sim_result:
-                    raise ValueError("No response received from AI assistant")
-
+            sim_prompt = f"""Analyze repetition in: {text[:analysis_depth]}
+Return ONLY JSON: {{"repetition_score": 0-100, "most_repeated_phrases": [{{"phrase": "...", "count": N}}], "suggestions": "string"}}"""
+            sim_result = ai_assistant(sim_prompt, "You analyze text repetition. Return ONLY valid JSON.")
+            if sim_result:
                 try:
-                    # Clean the response
-                    clean_result = sim_result.strip()
-                    if clean_result.startswith("```json"):
-                        clean_result = clean_result[7:]
-                    if clean_result.startswith("```"):
-                        clean_result = clean_result[3:]
-                    if clean_result.endswith("```"):
-                        clean_result = clean_result[:-3]
-
-                    sim_data = json.loads(clean_result)
-
-                    # Validate required fields
-                    required_fields = ["repetition_score", "most_repeated_phrases", "suggestions"]
-                    for field in required_fields:
-                        if field not in sim_data:
-                            raise ValueError(f"Missing required field: {field}")
-
-                    # Display results
+                    clean = sim_result.strip().lstrip("```json").lstrip("```").rstrip("```")
+                    sim_data = json.loads(clean)
                     st.progress(sim_data["repetition_score"] / 100)
-
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Repetition Score", f"{sim_data['repetition_score']}%")
-                    with col2:
-                        st.metric("Unique Phrases", f"{100 - sim_data['repetition_score']}%")
-
-                    if isinstance(sim_data["most_repeated_phrases"], list):
-                        with st.expander("Top Repeated Phrases"):
-                            for item in sim_data["most_repeated_phrases"][:5]:
-                                if isinstance(item, dict):
-                                    st.code(f"{item.get('phrase', '')} (repeated {item.get('count', 0)}x)")
-
-                    st.info("Suggestions: " + sim_data["suggestions"])
-
+                    st.metric("Repetition Score", f"{sim_data['repetition_score']}%")
+                    st.info("Suggestions: " + sim_data.get("suggestions", ""))
                 except Exception as e:
-                    st.error(f"Error processing similarity analysis: {str(e)}")
-                    st.text_area("Raw Similarity Response", value=sim_result, height=200)
-
-            except Exception as e:
-                st.error(f"Similarity analysis failed: {str(e)}")
-
-            # Writing Style Analysis
-            st.subheader("✍️ Writing Style")
-            try:
-                style_prompt = f"""Analyze this text's writing style:
-                {text[:3000]}
-
-                Return ONLY a JSON object with these keys:
-                - "academic_tone_score": number between 0-100
-                - "vocabulary_diversity": number between 0-100
-                - "potential_issues": list of strings
-                - make sure that the analysis is based from the whole text and not focusing in a single sentence or phrases to prevent false positives or systematic errors in calculating.
-                total score must be based on the overall text given.
-                Example response:
-                {{
-                    "academic_tone_score": 80,
-                    "vocabulary_diversity": 65,
-                    "potential_issues": [
-                        "Overuse of passive voice",
-                        "Limited sentence variety"
-                    ]
-                }}
-                """
-
-                style_result = ai_assistant(style_prompt, "You analyze writing style. Return ONLY valid JSON.")
-                if not style_result:
-                    raise ValueError("No response received from AI assistant")
-
-                try:
-                    # Clean the response
-                    clean_result = style_result.strip()
-                    if clean_result.startswith("```json"):
-                        clean_result = clean_result[7:]
-                    if clean_result.startswith("```"):
-                        clean_result = clean_result[3:]
-                    if clean_result.endswith("```"):
-                        clean_result = clean_result[:-3]
-
-                    style_data = json.loads(clean_result)
-
-                    # Validate required fields
-                    required_fields = ["academic_tone_score", "vocabulary_diversity", "potential_issues"]
-                    for field in required_fields:
-                        if field not in style_data:
-                            raise ValueError(f"Missing required field: {field}")
-
-                    # Display results
-                    st.metric("Academic Tone", f"{style_data['academic_tone_score']}%")
-                    st.metric("Vocabulary Diversity", f"{style_data['vocabulary_diversity']}%")
-
-                    if isinstance(style_data["potential_issues"], list):
-                        with st.expander("Style Suggestions"):
-                            for issue in style_data["potential_issues"]:
-                                if isinstance(issue, str):
-                                    st.markdown(f"- {issue}")
-
-                except Exception as e:
-                    st.error(f"Error processing style analysis: {str(e)}")
-                    st.text_area("Raw Style Response", value=style_result, height=200)
-
-            except Exception as e:
-                st.error(f"Style analysis failed: {str(e)}")
-# from bs4 import BeautifulSoup
-# from docx import Document
-# import python_pptx
+                    st.error(f"Error: {str(e)}")
 
 
-# Add to your pages dictionary
+# ─────────────────────────────────────────────────────────────
+#  🔣 SYMBOL QUIZ  (image → type the answer)
+# ─────────────────────────────────────────────────────────────
+def symbol_quiz():
+    st.title("🔣 Symbol Quiz")
+    st.caption("See a symbol image — type what it means. Upload your symbol PDF to begin.")
 
-
-def about():
-    st.title("About")
-
-pages={ "Tools": [st.Page(main_page, title="Home"), st.Page(aito, title="AITO"),
-                  st.Page(esma, title="Essay Maker"),
-                  st.Page(tetos, title="Text To Speech"),
-                  st.Page(pdf2quiz, title="Pdf To Quiz"),
-                  st.Page(turnitin_knockoff, title="Originality Checker"),],
-        "About": [st.Page(about, title="About")],
-
+    # ── Session state ─────────────────────────────────────────
+    if "sq" not in st.session_state:
+        st.session_state.sq = {
+            "pairs":        [],   # [{"img_bytes": bytes, "answer": str}]
+            "quiz":         [],   # shuffled subset of pairs
+            "user_answers": {},   # index -> str
+            "submitted":    False,
+            "num_q":        10,
         }
+    sq = st.session_state.sq
+
+    # ── PDF extraction ────────────────────────────────────────
+    def extract_image_pairs(uploaded_file) -> list:
+        """
+        For each page, grab every embedded image and find its closest
+        text label. Returns list of {"img_bytes": bytes, "answer": str}.
+
+        Strategy:
+          • Get all text blocks on the page (type=0).
+          • For each image, find the text block whose top edge (by0) is
+            closest to the image's bottom edge (img_rect.y1).
+          • Also checks text ABOVE the image in case the label precedes it.
+          • Skips images that are too large (likely decorative page backgrounds)
+            or too small (likely bullets/icons with no real meaning).
+        """
+        raw = uploaded_file.read()
+        doc = fitz.open(stream=raw, filetype="pdf")
+        pairs = []
+        seen_xrefs = set()
+
+        for page in doc:
+            page_rect   = page.rect
+            page_area   = page_rect.width * page_rect.height
+            img_list    = page.get_images(full=True)
+            text_blocks = [b for b in page.get_text("blocks") if b[6] == 0 and b[4].strip()]
+
+            for img_info in img_list:
+                xref = img_info[0]
+                if xref in seen_xrefs:
+                    continue
+                seen_xrefs.add(xref)
+
+                base_img  = doc.extract_image(xref)
+                img_bytes = base_img["image"]
+                img_w     = base_img.get("width", 0)
+                img_h     = base_img.get("height", 0)
+
+                # Skip images that are too tiny or fill the whole page
+                if img_w < 20 or img_h < 20:
+                    continue
+                if img_w * img_h > 0.5 * page_area:
+                    continue
+
+                rects = page.get_image_rects(xref)
+                if not rects:
+                    continue
+                img_rect = rects[0]
+                img_cx   = (img_rect.x0 + img_rect.x1) / 2
+                img_cy   = (img_rect.y0 + img_rect.y1) / 2
+
+                # Score each text block by proximity + horizontal alignment
+                def block_score(b):
+                    bx0, by0, bx1, by1 = b[0], b[1], b[2], b[3]
+                    bcx = (bx0 + bx1) / 2
+                    # vertical distance from image edge to block edge
+                    vert = min(abs(by0 - img_rect.y1), abs(by1 - img_rect.y0))
+                    # horizontal offset penalty
+                    horiz = abs(bcx - img_cx) * 0.3
+                    return vert + horiz
+
+                if not text_blocks:
+                    continue
+
+                best = min(text_blocks, key=block_score)
+                label = best[4].strip().replace("\n", " ")
+
+                # Only keep if label is reasonably close (within 120 pts)
+                if block_score(best) > 120:
+                    continue
+
+                pairs.append({"img_bytes": img_bytes, "answer": label})
+
+        # ── Strategy B: vector drawings ──────────────────────
+        # Many symbol PDFs use drawn vector paths instead of embedded
+        # raster images. Render the page at high DPI, cluster the
+        # drawing paths spatially, then crop each cluster out.
+        if not pairs:
+            for page in doc:
+                page_area   = page.rect.width * page.rect.height
+                text_blocks = [b for b in page.get_text("blocks") if b[6] == 0 and b[4].strip()]
+                drawings    = page.get_drawings()
+                if not drawings:
+                    continue
+                draw_rects = [fitz.Rect(d["rect"]) for d in drawings if d.get("rect")]
+                if not draw_rects:
+                    continue
+
+                # Merge nearby rects into clusters (each symbol = group of paths)
+                clusters, used = [], [False] * len(draw_rects)
+                for i_r, r in enumerate(draw_rects):
+                    if used[i_r]:
+                        continue
+                    cluster  = fitz.Rect(r)
+                    used[i_r] = True
+                    changed  = True
+                    while changed:
+                        changed = False
+                        for j_r, r2 in enumerate(draw_rects):
+                            if not used[j_r]:
+                                grown = fitz.Rect(cluster.x0-40, cluster.y0-40, cluster.x1+40, cluster.y1+40)
+                                if grown.intersects(r2):
+                                    cluster.include_rect(r2)
+                                    used[j_r] = True
+                                    changed    = True
+                    if cluster.width > 12 and cluster.height > 12 and cluster.get_area() < 0.4 * page_area:
+                        clusters.append(cluster)
+
+                mat = fitz.Matrix(3, 3)
+                for cluster in clusters:
+                    padded = fitz.Rect(cluster.x0-6, cluster.y0-6, cluster.x1+6, cluster.y1+6).intersect(page.rect)
+                    pix       = page.get_pixmap(matrix=mat, clip=padded, alpha=False)
+                    img_bytes = pix.tobytes("png")
+                    cx = (cluster.x0 + cluster.x1) / 2
+
+                    def bsv(b):
+                        bx0, by0, bx1, by1 = b[0], b[1], b[2], b[3]
+                        return min(abs(by0 - cluster.y1), abs(by1 - cluster.y0)) + abs((bx0+bx1)/2 - cx) * 0.3
+
+                    if not text_blocks:
+                        continue
+                    best  = min(text_blocks, key=bsv)
+                    label = best[4].strip().replace("\n", " ")
+                    if bsv(best) <= 150 and label:
+                        pairs.append({"img_bytes": img_bytes, "answer": label})
+
+        doc.close()
+        # Deduplicate by answer text
+        seen, unique = set(), []
+        for p in pairs:
+            key = p["answer"].lower().strip()
+            if key not in seen:
+                seen.add(key)
+                unique.append(p)
+        return unique
+
+    # ── Render image from bytes ───────────────────────────────
+    def show_image(img_bytes: bytes, size: int = 180):
+        try:
+            img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+            img.thumbnail((size, size), Image.LANCZOS)
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            b64 = base64.b64encode(buf.getvalue()).decode()
+            st.markdown(
+                f"""
+                <div style="
+                    display:flex; justify-content:center; align-items:center;
+                    padding:16px; background:#1a1a2e; border-radius:12px;
+                    border:2px solid #ff6a6a; margin-bottom:8px;">
+                  <img src="data:image/png;base64,{b64}"
+                       style="max-width:{size}px; max-height:{size}px;
+                              image-rendering:pixelated;" />
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        except Exception as e:
+            st.error(f"Could not render image: {e}")
+
+    # ── Fuzzy match helper ────────────────────────────────────
+    def is_correct(user: str, correct: str) -> tuple[bool, bool, int]:
+        """Returns (exact_match, close_match, pct)"""
+        u = user.lower().strip()
+        c = correct.lower().strip()
+        pct = int(SequenceMatcher(None, u, c).ratio() * 100)
+        return u == c, pct >= 70, pct
+
+    # ─────────────────────────────────────────────────────────
+    # SIDEBAR — upload + settings
+    # ─────────────────────────────────────────────────────────
+    with st.sidebar:
+        st.header("⚙️ Symbol Quiz Settings")
+        uploaded_pdf  = st.file_uploader("📄 Upload Symbol PDF", type=["pdf"])
+        num_questions = st.slider("Questions per round", min_value=3, max_value=40, value=10)
+
+        if uploaded_pdf and st.button("📥 Load PDF & Build Quiz", type="primary"):
+            with st.spinner("Extracting symbol images from PDF…"):
+                pairs = extract_image_pairs(uploaded_pdf)
+
+            if not pairs:
+                st.error(
+                    "No symbol images with nearby labels were found.\n\n"
+                    "Make sure the PDF has **embedded images** (not scanned), "
+                    "each with a text label close by."
+                )
+            else:
+                st.success(f"✅ Extracted {len(pairs)} symbol pairs!")
+                pool = pairs.copy()
+                random.shuffle(pool)
+                sq["pairs"]        = pairs
+                sq["quiz"]         = pool[:min(num_questions, len(pool))]
+                sq["user_answers"] = {}
+                sq["submitted"]    = False
+                sq["num_q"]        = num_questions
+                st.rerun()
+
+        if sq["pairs"]:
+            st.caption(f"Library: {len(sq['pairs'])} symbols loaded")
+            if st.button("🔀 New Random Round"):
+                pool = sq["pairs"].copy()
+                random.shuffle(pool)
+                sq["quiz"]         = pool[:min(num_questions, len(pool))]
+                sq["user_answers"] = {}
+                sq["submitted"]    = False
+                st.rerun()
+
+    # ─────────────────────────────────────────────────────────
+    # EMPTY STATE
+    # ─────────────────────────────────────────────────────────
+    if not sq["quiz"]:
+        st.info("👈 Upload your symbol PDF in the sidebar, then click **Load PDF & Build Quiz**.")
+        st.markdown("""
+        **How it works:**
+        1. Upload a PDF where each symbol is an **embedded image** next to its label/name
+        2. The app automatically pairs each image with its nearest text label
+        3. You see the symbol — type the answer — get instant feedback after submitting
+
+        > 💡 Works best with PDFs that have clear image + label layouts  
+        > (e.g. electrical symbols, chemical hazard symbols, music notation, map legends)
+        """)
+        return
+
+    # ─────────────────────────────────────────────────────────
+    # SCORE BANNER (shown after submit)
+    # ─────────────────────────────────────────────────────────
+    total_q = len(sq["quiz"])
+
+    if sq["submitted"]:
+        results = [
+            is_correct(sq["user_answers"].get(i, ""), item["answer"])
+            for i, item in enumerate(sq["quiz"])
+        ]
+        score = sum(1 for exact, close, _ in results if exact or close)
+        pct   = score / total_q * 100
+        emoji = "🏆" if pct >= 90 else "🎉" if pct >= 75 else "👍" if pct >= 55 else "📚"
+
+        st.markdown(
+            f"""
+            <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);
+                        border:2px solid #ff6a6a; border-radius:14px;
+                        padding:20px; text-align:center; margin-bottom:24px;">
+              <div style="font-size:2.5rem;">{emoji}</div>
+              <div style="font-size:1.8rem; font-weight:700; color:#ff6a6a;">
+                {score} / {total_q}
+              </div>
+              <div style="color:#aaa; font-size:1rem;">{pct:.1f}% correct</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    else:
+        answered = sum(1 for v in sq["user_answers"].values() if str(v).strip())
+        st.markdown(
+            f'<p style="color:#aaa; margin-bottom:8px;">Progress: '
+            f'<b style="color:#ff6a6a">{answered}/{total_q}</b> answered</p>',
+            unsafe_allow_html=True,
+        )
+
+    st.divider()
+
+    # ─────────────────────────────────────────────────────────
+    # QUIZ CARDS
+    # ─────────────────────────────────────────────────────────
+    all_answered = True
+
+    for i, item in enumerate(sq["quiz"]):
+        with st.container(border=True):
+            left_col, right_col = st.columns([1, 2], gap="large")
+
+            with left_col:
+                st.markdown(f"**#{i+1}**")
+                show_image(item["img_bytes"])
+
+            with right_col:
+                st.markdown("**What does this symbol represent?**")
+
+                cur = sq["user_answers"].get(i, "")
+
+                # After submit: show read-only answer + feedback
+                if sq["submitted"]:
+                    exact, close, pct = is_correct(cur, item["answer"])
+                    st.text_input(
+                        "Your answer",
+                        value=cur,
+                        key=f"sq_done_{i}",
+                        disabled=True,
+                        label_visibility="collapsed",
+                    )
+                    if exact:
+                        st.success(f"✅ **Correct!** — {item['answer']}")
+                    elif close:
+                        st.warning(f"🟡 **Close enough ({pct}%)** — correct: **{item['answer']}**")
+                    else:
+                        st.error(f"❌ **Wrong** — correct answer: **{item['answer']}**")
+
+                # Before submit: live input
+                else:
+                    ans = st.text_input(
+                        "Your answer",
+                        value=cur,
+                        key=f"sq_q_{i}",
+                        placeholder="Type the meaning or name…",
+                        label_visibility="collapsed",
+                    )
+                    if ans != cur:
+                        sq["user_answers"][i] = ans
+                        # no rerun on every keystroke — let Streamlit handle naturally
+
+                    if not str(sq["user_answers"].get(i, "")).strip():
+                        all_answered = False
+
+    # ─────────────────────────────────────────────────────────
+    # ACTION BUTTONS
+    # ─────────────────────────────────────────────────────────
+    st.divider()
+    btn_col1, btn_col2 = st.columns(2)
+
+    with btn_col1:
+        if not sq["submitted"]:
+            if st.button(
+                "✅ Submit All Answers",
+                type="primary",
+                use_container_width=True,
+                disabled=not all_answered,
+            ):
+                sq["submitted"] = True
+                st.rerun()
+
+    with btn_col2:
+        label = "🔄 Try Again (same set)" if sq["submitted"] else "🔄 Clear Answers"
+        if st.button(label, use_container_width=True):
+            sq["user_answers"] = {}
+            sq["submitted"]    = False
+            st.rerun()
+
+
+# ─────────────────────────────────────────────────────────────
+#  ABOUT
+# ─────────────────────────────────────────────────────────────
+def about():
+    st.title("About LleY")
+    st.markdown("""
+    **LleY** is a suite of AI-powered tools for students and creators.
+
+    | Tool | Description |
+    |------|-------------|
+    | AITO | General-purpose AI chatbot |
+    | Essay Maker | AI essay and content generator |
+    | Text To Speech | 200+ voices via Edge TTS |
+    | PDF To Quiz | Generate quizzes from documents |
+    | Originality Checker | AI + plagiarism detection |
+    | **Symbol Quiz** | **Upload a symbol PDF and quiz yourself!** |
+    """)
+
+
+# ─────────────────────────────────────────────────────────────
+#  NAVIGATION
+# ─────────────────────────────────────────────────────────────
+pages = {
+    "Tools": [
+        st.Page(main_page,          title="Home"),
+        st.Page(aito,               title="AITO"),
+        st.Page(esma,               title="Essay Maker"),
+        st.Page(tetos,              title="Text To Speech"),
+        st.Page(pdf2quiz,           title="Pdf To Quiz"),
+        st.Page(turnitin_knockoff,  title="Originality Checker"),
+        st.Page(symbol_quiz,        title="Symbol Quiz"),   # ← NEW
+    ],
+    "About": [st.Page(about, title="About")],
+}
+
 pg = st.navigation(pages)
 pg.run()
-
-
-
-
-
