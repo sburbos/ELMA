@@ -651,188 +651,147 @@ def symbol_quiz():
         }
     sq = st.session_state.sq
 
-    # ── PDF extraction ────────────────────────────────────────
-    def extract_image_pairs(uploaded_file) -> list:
+    # ── AI vision extraction ──────────────────────────────────
+    def extract_pairs_via_ai(uploaded_file) -> list:
         """
-        Layout-aware extraction that handles:
-          • Two-column PDFs  (symbol | label side by side)
-          • Grid PDFs        (symbol top, label below — multiple columns)
-          • Single-column    (symbol above or below its label)
+        Step 1 — render every PDF page to a high-res PNG.
+        Step 2 — send each page image to Gemini vision with a prompt
+                 that asks it to list every (symbol_label, bounding_box)
+                 pair it sees, regardless of how the page is laid out
+                 (single column, two-column NEMA/IEC split, grid, etc.)
+        Step 3 — use the bounding boxes to crop each symbol image out
+                 of the rendered page, paired with its AI-identified label.
+        Returns list of {"img_bytes": bytes, "answer": str}
+        """
+        import re
 
-        Core idea:
-          1. Detect if the page is split into columns by finding a
-             vertical "gap" in the x-positions of images vs text.
-          2. For each image, only consider text blocks that are in the
-             SAME logical cell — defined by matching column band AND
-             matching row band.  This prevents a symbol in column-1
-             from stealing the label that belongs to column-2.
-          3. Within the candidate set, pick the text block whose
-             vertical center is closest to the image's vertical center.
-        """
         raw = uploaded_file.read()
-        doc  = fitz.open(stream=raw, filetype="pdf")
-        pairs = []
-        seen_xrefs = set()
+        doc = fitz.open(stream=raw, filetype="pdf")
+        all_pairs = []
 
-        # ── Helper: cluster 1-D values into groups ────────────
-        def cluster_1d(values, gap=40):
-            """Split sorted float list into groups separated by > gap."""
-            if not values:
-                return []
-            groups, cur = [], [values[0]]
-            for v in values[1:]:
-                if v - cur[-1] > gap:
-                    groups.append(cur)
-                    cur = []
-                cur.append(v)
-            groups.append(cur)
-            return groups
+        for page_num, page in enumerate(doc):
+            # ── Render page at 2× for crisp crops ────────────
+            mat = fitz.Matrix(2, 2)
+            pix = page.get_pixmap(matrix=mat, alpha=False)
+            page_png = pix.tobytes("png")
+            pw, ph   = pix.width, pix.height   # pixel dimensions at 2× scale
 
-        # ── Helper: which band index does a value fall into ───
-        def band_of(value, bands):
-            """Return index of band whose range contains value."""
-            for i, b in enumerate(bands):
-                if b[0] - 20 <= value <= b[-1] + 20:
-                    return i
-            # fallback: nearest band centre
-            centres = [(sum(b)/len(b), i) for i, b in enumerate(bands)]
-            return min(centres, key=lambda x: abs(x[0] - value))[1]
+            # ── Ask AI to identify all symbol+label pairs ─────
+            page_b64 = base64.b64encode(page_png).decode()
 
-        for page in doc:
-            page_w    = page.rect.width
-            page_h    = page.rect.height
-            page_area = page_w * page_h
-            img_list  = page.get_images(full=True)
-            text_blocks = [b for b in page.get_text("blocks") if b[6] == 0 and b[4].strip()]
+            ai_prompt = f"""This is page {page_num + 1} of an electrical/technical symbol reference PDF.
+The page may be split into sections (e.g. NEMA on the left half, IEC on the right half),
+or arranged in a grid with multiple columns of symbol+label pairs.
 
-            if not img_list or not text_blocks:
-                continue
+Your job: identify EVERY symbol drawing and its corresponding label/name on this page.
 
-            # ── Step 1: collect image rects, skip bad ones ────
-            img_data = []   # (rect, img_bytes)
-            for img_info in img_list:
-                xref = img_info[0]
-                if xref in seen_xrefs:
-                    continue
-                seen_xrefs.add(xref)
+For each symbol found, return a JSON object with:
+  - "label": the exact text name/label for that symbol (short name, not a description)
+  - "bbox": [x1, y1, x2, y2] bounding box of just the SYMBOL IMAGE in pixels
+             (not the text — just the drawing itself)
+             Coordinates are relative to this image which is {pw}×{ph} pixels.
 
-                base_img  = doc.extract_image(xref)
-                img_bytes = base_img["image"]
-                iw        = base_img.get("width",  0)
-                ih        = base_img.get("height", 0)
+Rules:
+- If the page has a NEMA column and IEC column, treat them as SEPARATE symbols — 
+  each gets its own entry even if they represent the same component type.
+  Label them like "Resistor (NEMA)" and "Resistor (IEC)" if needed.
+- Do NOT include headers, titles, or section labels as symbols.
+- The label must be the short name directly associated with that specific drawing.
+- Be precise with bounding boxes — crop tightly around just the symbol drawing.
 
-                if iw < 15 or ih < 15:
-                    continue
-                if iw * ih > 0.45 * page_area:
-                    continue
+Return ONLY a valid JSON array, no explanation, no markdown:
+[
+  {{"label": "Resistor", "bbox": [x1, y1, x2, y2]}},
+  {{"label": "Capacitor", "bbox": [x1, y1, x2, y2]}},
+  ...
+]"""
 
-                rects = page.get_image_rects(xref)
-                if not rects:
-                    continue
-                img_data.append((rects[0], img_bytes))
-
-            if not img_data:
-                continue
-
-            # ── Step 2: detect column layout ─────────────────
-            # Gather x-centres of images and text blocks
-            img_cx_vals  = sorted([(r.x0 + r.x1) / 2 for r, _ in img_data])
-            text_cx_vals = sorted([(b[0] + b[2]) / 2 for b in text_blocks])
-
-            img_col_groups  = cluster_1d(img_cx_vals,  gap=page_w * 0.15)
-            text_col_groups = cluster_1d(text_cx_vals, gap=page_w * 0.15)
-
-            # Decide pairing orientation per column group:
-            # If images and text share the same column band → label is above/below (vertical layout)
-            # If image columns and text columns are DIFFERENT bands → label is to the right/left (horizontal layout)
-            num_img_cols  = len(img_col_groups)
-            num_text_cols = len(text_col_groups)
-
-            # Are there more text column bands than image column bands?
-            # That's the classic "left half = symbols, right half = labels" split.
-            split_layout = (num_text_cols > num_img_cols) or (
-                num_img_cols >= 2 and
-                abs(img_col_groups[0][-1] - text_col_groups[0][0]) > page_w * 0.1
+            client = OpenAI(
+                api_key="AIzaSyBN-rHdqfUbXL0H66zYb7cjwfUCU7ZFGtg",
+                base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
             )
 
-            # ── Step 3: detect row bands ──────────────────────
-            img_cy_vals = sorted([(r.y0 + r.y1) / 2 for r, _ in img_data])
-            row_groups  = cluster_1d(img_cy_vals, gap=page_h * 0.08)
-
-            # ── Step 4: pair each image with its label ────────
-            for img_rect, img_bytes in img_data:
-                icx = (img_rect.x0 + img_rect.x1) / 2
-                icy = (img_rect.y0 + img_rect.y1) / 2
-
-                img_col_idx = band_of(icx, img_col_groups)
-                img_row_idx = band_of(icy, row_groups)
-
-                if split_layout:
-                    # ── Horizontal split: image is in left column,
-                    #    label is in the SAME ROW in the right column.
-                    # Find the text column(s) that are to the RIGHT of this image col.
-                    img_col_right_edge = img_col_groups[img_col_idx][-1]
-
-                    # Candidate text blocks: must be to the right AND in same row band
-                    row_top    = row_groups[img_row_idx][0]  - page_h * 0.06
-                    row_bottom = row_groups[img_row_idx][-1] + page_h * 0.06
-
-                    candidates = [
-                        b for b in text_blocks
-                        if b[0] > img_col_right_edge - 10          # to the right
-                        and b[0] < img_rect.x0 + page_w * 0.6      # not too far right
-                        and row_top <= (b[1] + b[3]) / 2 <= row_bottom  # same row band
-                    ]
-
-                    # Fallback: if nothing to the right, look directly below
-                    if not candidates:
-                        candidates = [
-                            b for b in text_blocks
-                            if abs((b[0] + b[2]) / 2 - icx) < page_w * 0.25  # same column
-                            and b[1] > img_rect.y1 - 5                         # below image
-                            and b[1] < img_rect.y1 + 80                        # not too far
+            try:
+                response = client.chat.completions.create(
+                    model="gemini-2.0-flash",
+                    messages=[{
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:image/png;base64,{page_b64}"}
+                            },
+                            {"type": "text", "text": ai_prompt}
                         ]
+                    }],
+                    max_tokens=4000,
+                    temperature=0.1,
+                )
+                raw_response = response.choices[0].message.content or ""
+            except Exception as e:
+                st.warning(f"Page {page_num+1}: AI call failed — {e}")
+                continue
 
-                else:
-                    # ── Vertical layout: label is above or below, same column band
-                    col_left  = img_col_groups[img_col_idx][0]  - page_w * 0.12
-                    col_right = img_col_groups[img_col_idx][-1] + page_w * 0.12
-
-                    candidates = [
-                        b for b in text_blocks
-                        if col_left <= (b[0] + b[2]) / 2 <= col_right   # same column
-                        and (
-                            # directly below
-                            (b[1] >= img_rect.y1 - 8 and b[1] <= img_rect.y1 + 90)
-                            or
-                            # directly above
-                            (b[3] <= img_rect.y0 + 8 and b[3] >= img_rect.y0 - 90)
-                        )
-                    ]
-
-                if not candidates:
+            # ── Parse JSON response ───────────────────────────
+            try:
+                clean = raw_response.strip()
+                # Strip markdown fences if present
+                clean = re.sub(r"^```[a-z]*\n?", "", clean)
+                clean = re.sub(r"\n?```$", "", clean)
+                entries = json.loads(clean)
+            except Exception:
+                # Try to extract JSON array from anywhere in the response
+                match = re.search(r'\[.*\]', raw_response, re.DOTALL)
+                if not match:
+                    st.warning(f"Page {page_num+1}: Could not parse AI response.")
+                    continue
+                try:
+                    entries = json.loads(match.group())
+                except Exception:
+                    st.warning(f"Page {page_num+1}: Could not parse AI response.")
                     continue
 
-                # Pick candidate whose vertical centre is closest to image's vertical centre
-                best  = min(candidates, key=lambda b: abs((b[1] + b[3]) / 2 - icy))
-                label = best[4].strip().replace("\n", " ")
+            # ── Crop each symbol from the rendered page ───────
+            page_img = Image.open(io.BytesIO(page_png)).convert("RGB")
 
-                # Reject labels that look like instructions/long sentences
-                # (real symbol labels are usually short — under 60 chars)
-                if not label or len(label) > 120:
+            for entry in entries:
+                if not isinstance(entry, dict):
                     continue
-                # Skip labels that are mostly digits (page numbers, dimensions)
-                word_chars = sum(c.isalpha() for c in label)
-                if word_chars < 2:
+                label = str(entry.get("label", "")).strip()
+                bbox  = entry.get("bbox")
+
+                if not label or not bbox or len(bbox) != 4:
                     continue
 
-                pairs.append({"img_bytes": img_bytes, "answer": label})
+                # Clamp bbox to image bounds
+                x1 = max(0, int(bbox[0]))
+                y1 = max(0, int(bbox[1]))
+                x2 = min(pw, int(bbox[2]))
+                y2 = min(ph, int(bbox[3]))
+
+                if x2 <= x1 or y2 <= y1:
+                    continue
+                if (x2 - x1) < 10 or (y2 - y1) < 10:
+                    continue
+
+                # Add small padding around crop
+                pad = 6
+                crop = page_img.crop((
+                    max(0, x1 - pad), max(0, y1 - pad),
+                    min(pw, x2 + pad), min(ph, y2 + pad)
+                ))
+
+                buf = io.BytesIO()
+                crop.save(buf, format="PNG")
+                img_bytes = buf.getvalue()
+
+                all_pairs.append({"img_bytes": img_bytes, "answer": label})
 
         doc.close()
 
-        # Deduplicate by answer text
+        # Deduplicate by label (keep first occurrence)
         seen, unique = set(), []
-        for p in pairs:
+        for p in all_pairs:
             key = p["answer"].lower().strip()
             if key not in seen:
                 seen.add(key)
@@ -880,17 +839,19 @@ def symbol_quiz():
         num_questions = st.slider("Questions per round", min_value=3, max_value=40, value=10)
 
         if uploaded_pdf and st.button("📥 Load PDF & Build Quiz", type="primary"):
-            with st.spinner("Extracting symbol images from PDF…"):
-                pairs = extract_image_pairs(uploaded_pdf)
+            total_pages = fitz.open(stream=uploaded_pdf.read(), filetype="pdf").page_count
+            uploaded_pdf.seek(0)  # reset after peek
+            with st.spinner(f"AI is reading {total_pages} page(s) — this may take ~{total_pages * 5}s…"):
+                pairs = extract_pairs_via_ai(uploaded_pdf)
 
             if not pairs:
                 st.error(
-                    "No symbol images with nearby labels were found.\n\n"
-                    "Make sure the PDF has **embedded images** (not scanned), "
-                    "each with a text label close by."
+                    "No symbol pairs were found.\n\n"
+                    "Make sure the PDF is **not a scanned image** (text must be selectable) "
+                    "and that each symbol has a visible label nearby."
                 )
             else:
-                st.success(f"✅ Extracted {len(pairs)} symbol pairs!")
+                st.success(f"✅ Found {len(pairs)} symbol pairs!")
                 pool = pairs.copy()
                 random.shuffle(pool)
                 sq["pairs"]        = pairs
