@@ -35,7 +35,7 @@ def ai_assistant(prompt, rule):
     """OpenAI-compatible wrapper for Gemini Flash"""
     try:
         client = OpenAI(
-            api_key=os.environ.get("GEMINI_API_KEY", "AIzaSyB7bOBeKpQ1Lej4Uec7m_XS62p80y1ZsX4"),
+            api_key=os.environ.get("GEMINI_API_KEY", ""),
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
         )
         messages = []
@@ -640,7 +640,7 @@ def symbol_quiz():
     st.title("🔣 Symbol Quiz")
     st.caption("See a symbol image — type what it means. Upload your symbol PDF to begin.")
 
-    # ── Session state ─────────────────────────────────────────
+    # Session state
     if "sq" not in st.session_state:
         st.session_state.sq = {
             "pairs":        [],
@@ -648,118 +648,67 @@ def symbol_quiz():
             "user_answers": {},
             "submitted":    False,
             "num_q":        10,
-            "api_key":      os.environ.get("GEMINI_API_KEY", ""),
         }
     sq = st.session_state.sq
 
-    # ── AI vision extraction ──────────────────────────────────
-    def extract_pairs_via_ai(uploaded_file) -> list:
-        """
-        Renders each PDF page to PNG, sends to Gemini vision to identify
-        every symbol+label pair (handles any layout: split, grid, NEMA/IEC).
-        Returns list of {"img_bytes": bytes, "answer": str}
-        """
-        import re
-
-        api_key = sq.get("api_key", "").strip()
-        if not api_key:
-            st.error("❌ Please enter your Gemini API key in the sidebar.")
-            return []
-
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.0-flash")
-
+    # Extract embedded images from PDF and pair with nearest text label
+    def extract_image_pairs(uploaded_file) -> list:
         raw = uploaded_file.read()
         doc = fitz.open(stream=raw, filetype="pdf")
-        all_pairs = []
+        pairs = []
+        seen_xrefs = set()
 
-        for page_num, page in enumerate(doc):
-            # Render page at 2× resolution
-            mat     = fitz.Matrix(2, 2)
-            pix     = page.get_pixmap(matrix=mat, alpha=False)
-            page_png = pix.tobytes("png")
-            pw, ph  = pix.width, pix.height
+        for page in doc:
+            page_area   = page.rect.width * page.rect.height
+            img_list    = page.get_images(full=True)
+            text_blocks = [b for b in page.get_text("blocks") if b[6] == 0 and b[4].strip()]
 
-            ai_prompt = f"""This is page {page_num + 1} of an electrical/technical symbol reference PDF.
-The page may have multiple columns, e.g. NEMA symbols on the left half and IEC symbols on the right half, or a grid layout.
-
-Identify EVERY symbol drawing and its label. For each one return:
-  - "label": the short text name for that symbol
-  - "bbox": [x1, y1, x2, y2] pixel bounding box of just the DRAWING (not the text)
-             Image size is {pw}x{ph} pixels.
-
-Rules:
-- NEMA and IEC versions of the same component = TWO separate entries, label as "Name (NEMA)" and "Name (IEC)"
-- Skip page headers, section titles, column headers
-- Bounding box must wrap only the symbol drawing tightly
-
-Return ONLY a raw JSON array, no markdown, no explanation:
-[{{"label": "Resistor (NEMA)", "bbox": [10, 20, 80, 60]}}, ...]"""
-
-            try:
-                pil_image = Image.open(io.BytesIO(page_png))
-                response  = model.generate_content(
-                    [ai_prompt, pil_image],
-                    generation_config=genai.GenerationConfig(
-                        temperature=0.1,
-                        max_output_tokens=4000,
-                    )
-                )
-                raw_response = response.text or ""
-            except Exception as e:
-                st.warning(f"Page {page_num+1}: AI call failed — {e}")
-                continue
-
-            # ── Parse JSON ────────────────────────────────────
-            try:
-                clean   = raw_response.strip()
-                clean   = re.sub(r"^```[a-z]*\n?", "", clean)
-                clean   = re.sub(r"\n?```$",        "", clean).strip()
-                entries = json.loads(clean)
-            except Exception:
-                match = re.search(r'\[.*?\]', raw_response, re.DOTALL)
-                if not match:
-                    st.warning(f"Page {page_num+1}: Could not parse AI response.")
+            for img_info in img_list:
+                xref = img_info[0]
+                if xref in seen_xrefs:
                     continue
-                try:
-                    entries = json.loads(match.group())
-                except Exception:
-                    st.warning(f"Page {page_num+1}: Could not parse AI response.")
+                seen_xrefs.add(xref)
+
+                base_img  = doc.extract_image(xref)
+                img_bytes = base_img["image"]
+                iw        = base_img.get("width", 0)
+                ih        = base_img.get("height", 0)
+
+                if iw < 15 or ih < 15:
+                    continue
+                if iw * ih > 0.45 * page_area:
                     continue
 
-            # ── Crop each symbol from the rendered page ───────
-            page_img = Image.open(io.BytesIO(page_png)).convert("RGB")
-
-            for entry in entries:
-                if not isinstance(entry, dict):
+                rects = page.get_image_rects(xref)
+                if not rects:
                     continue
-                label = str(entry.get("label", "")).strip()
-                bbox  = entry.get("bbox")
-                if not label or not bbox or len(bbox) != 4:
-                    continue
+                img_rect = rects[0]
+                icx = (img_rect.x0 + img_rect.x1) / 2
+                icy = (img_rect.y0 + img_rect.y1) / 2
 
-                x1 = max(0,  int(bbox[0]))
-                y1 = max(0,  int(bbox[1]))
-                x2 = min(pw, int(bbox[2]))
-                y2 = min(ph, int(bbox[3]))
-
-                if x2 <= x1 or y2 <= y1 or (x2-x1) < 10 or (y2-y1) < 10:
+                if not text_blocks:
                     continue
 
-                pad  = 8
-                crop = page_img.crop((
-                    max(0,  x1 - pad), max(0,  y1 - pad),
-                    min(pw, x2 + pad), min(ph, y2 + pad)
-                ))
-                buf = io.BytesIO()
-                crop.save(buf, format="PNG")
-                all_pairs.append({"img_bytes": buf.getvalue(), "answer": label})
+                def score(b):
+                    bx0, by0, bx1, by1 = b[0], b[1], b[2], b[3]
+                    vert  = min(abs(by0 - img_rect.y1), abs(by1 - img_rect.y0))
+                    horiz = abs((bx0 + bx1) / 2 - icx) * 0.3
+                    return vert + horiz
+
+                best  = min(text_blocks, key=score)
+                if score(best) > 120:
+                    continue
+                label = best[4].strip().replace("\n", " ")
+                if not label or len(label) > 120:
+                    continue
+                if sum(c.isalpha() for c in label) < 2:
+                    continue
+
+                pairs.append({"img_bytes": img_bytes, "answer": label})
 
         doc.close()
-
-        # Deduplicate by label
         seen, unique = set(), []
-        for p in all_pairs:
+        for p in pairs:
             key = p["answer"].lower().strip()
             if key not in seen:
                 seen.add(key)
@@ -803,34 +752,15 @@ Return ONLY a raw JSON array, no markdown, no explanation:
     # ─────────────────────────────────────────────────────────
     with st.sidebar:
         st.header("⚙️ Symbol Quiz Settings")
-
-        # API key input — pre-filled from env if available
-        key_input = st.text_input(
-            "🔑 Gemini API Key",
-            value=sq["api_key"],
-            type="password",
-            placeholder="Paste your Gemini API key here",
-            help="Get a free key at aistudio.google.com → Get API key",
-        )
-        if key_input != sq["api_key"]:
-            sq["api_key"] = key_input
-
-        if not sq["api_key"]:
-            st.warning("Enter your Gemini API key above to continue.")
-
-        st.divider()
         uploaded_pdf  = st.file_uploader("📄 Upload Symbol PDF", type=["pdf"])
         num_questions = st.slider("Questions per round", min_value=3, max_value=40, value=10)
 
-        ready = bool(sq["api_key"]) and uploaded_pdf is not None
-        if st.button("📥 Load PDF & Build Quiz", type="primary", disabled=not ready):
-            total_pages = fitz.open(stream=uploaded_pdf.read(), filetype="pdf").page_count
-            uploaded_pdf.seek(0)
-            with st.spinner(f"AI is reading {total_pages} page(s) — ~{total_pages * 8}s…"):
-                pairs = extract_pairs_via_ai(uploaded_pdf)
+        if uploaded_pdf and st.button("📥 Load PDF & Build Quiz", type="primary"):
+            with st.spinner("Extracting symbol images from PDF…"):
+                pairs = extract_image_pairs(uploaded_pdf)
 
             if not pairs:
-                st.error("No symbol pairs found. Check that the PDF has real symbol drawings with text labels.")
+                st.error("No symbol images found. Make sure the PDF has embedded symbol drawings with text labels nearby.")
             else:
                 st.success(f"✅ Found {len(pairs)} symbol pairs!")
                 pool = pairs.copy()
