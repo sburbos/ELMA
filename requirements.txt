@@ -5,6 +5,9 @@ openai
 python-pptx
 edge-tts
 PyPDF2
+pymupdf
+Pillow
 python-dotenv>=1.0.0
 requests
+
 google-generativeai
