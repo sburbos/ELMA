@@ -35,7 +35,7 @@ def ai_assistant(prompt, rule):
     """OpenAI-compatible wrapper for Gemini Flash"""
     try:
         client = OpenAI(
-            api_key=os.environ.get("GEMINI_API_KEY", ""),
+            api_key=os.environ.get("GEMINI_API_KEY", "AIzaSyCIcsMgAFh_Ki5KnIebH96zjh9WQ-M397g"),
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
         )
         messages = []
@@ -971,3 +971,4 @@ pages = {
 
 pg = st.navigation(pages)
 pg.run()
+
