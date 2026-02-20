@@ -1,4 +1,4 @@
-#google api key AIzaSyAI_nzXk4dW-VUxG7T23uB_Tm9WXT3ZQ1M
+# API key stored in Replit Secrets as GEMINI_API_KEY
 import streamlit as st
 import openai
 import tempfile
@@ -32,10 +32,10 @@ st.logo("final logo 2.png", icon_image="enlarge 1.png", size="large")
 
 
 def ai_assistant(prompt, rule):
-    """OpenAI-compatible wrapper for Gemini 2.0 Flash"""
+    """OpenAI-compatible wrapper for Gemini Flash"""
     try:
         client = OpenAI(
-            api_key="AIzaSyB7bOBeKpQ1Lej4Uec7m_XS62p80y1ZsX4",
+            api_key=os.environ.get("GEMINI_API_KEY", "AIzaSyB7bOBeKpQ1Lej4Uec7m_XS62p80y1ZsX4"),
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
         )
         messages = []
@@ -654,94 +654,70 @@ def symbol_quiz():
     # ── AI vision extraction ──────────────────────────────────
     def extract_pairs_via_ai(uploaded_file) -> list:
         """
-        Step 1 — render every PDF page to a high-res PNG.
-        Step 2 — send each page image to Gemini vision with a prompt
-                 that asks it to list every (symbol_label, bounding_box)
-                 pair it sees, regardless of how the page is laid out
-                 (single column, two-column NEMA/IEC split, grid, etc.)
-        Step 3 — use the bounding boxes to crop each symbol image out
-                 of the rendered page, paired with its AI-identified label.
+        Renders each PDF page to PNG, sends to Gemini vision to identify
+        every symbol+label pair (handles any layout: split, grid, NEMA/IEC).
         Returns list of {"img_bytes": bytes, "answer": str}
         """
         import re
+
+        # ── Get API key from Replit secret ────────────────────
+        api_key = os.environ.get("GEMINI_API_KEY", "")
+        if not api_key:
+            st.error("❌ GEMINI_API_KEY not found. Add it in Replit → Secrets (🔒).")
+            return []
+
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-2.0-flash")
 
         raw = uploaded_file.read()
         doc = fitz.open(stream=raw, filetype="pdf")
         all_pairs = []
 
         for page_num, page in enumerate(doc):
-            # ── Render page at 2× for crisp crops ────────────
-            mat = fitz.Matrix(2, 2)
-            pix = page.get_pixmap(matrix=mat, alpha=False)
+            # Render page at 2× resolution
+            mat     = fitz.Matrix(2, 2)
+            pix     = page.get_pixmap(matrix=mat, alpha=False)
             page_png = pix.tobytes("png")
-            pw, ph   = pix.width, pix.height   # pixel dimensions at 2× scale
-
-            # ── Ask AI to identify all symbol+label pairs ─────
-            page_b64 = base64.b64encode(page_png).decode()
+            pw, ph  = pix.width, pix.height
 
             ai_prompt = f"""This is page {page_num + 1} of an electrical/technical symbol reference PDF.
-The page may be split into sections (e.g. NEMA on the left half, IEC on the right half),
-or arranged in a grid with multiple columns of symbol+label pairs.
+The page may have multiple columns, e.g. NEMA symbols on the left half and IEC symbols on the right half, or a grid layout.
 
-Your job: identify EVERY symbol drawing and its corresponding label/name on this page.
-
-For each symbol found, return a JSON object with:
-  - "label": the exact text name/label for that symbol (short name, not a description)
-  - "bbox": [x1, y1, x2, y2] bounding box of just the SYMBOL IMAGE in pixels
-             (not the text — just the drawing itself)
-             Coordinates are relative to this image which is {pw}×{ph} pixels.
+Identify EVERY symbol drawing and its label. For each one return:
+  - "label": the short text name for that symbol
+  - "bbox": [x1, y1, x2, y2] pixel bounding box of just the DRAWING (not the text)
+             Image size is {pw}x{ph} pixels.
 
 Rules:
-- If the page has a NEMA column and IEC column, treat them as SEPARATE symbols — 
-  each gets its own entry even if they represent the same component type.
-  Label them like "Resistor (NEMA)" and "Resistor (IEC)" if needed.
-- Do NOT include headers, titles, or section labels as symbols.
-- The label must be the short name directly associated with that specific drawing.
-- Be precise with bounding boxes — crop tightly around just the symbol drawing.
+- NEMA and IEC versions of the same component = TWO separate entries, label as "Name (NEMA)" and "Name (IEC)"
+- Skip page headers, section titles, column headers
+- Bounding box must wrap only the symbol drawing tightly
 
-Return ONLY a valid JSON array, no explanation, no markdown:
-[
-  {{"label": "Resistor", "bbox": [x1, y1, x2, y2]}},
-  {{"label": "Capacitor", "bbox": [x1, y1, x2, y2]}},
-  ...
-]"""
-
-            client = OpenAI(
-                api_key="AIzaSyBN-rHdqfUbXL0H66zYb7cjwfUCU7ZFGtg",
-                base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
-            )
+Return ONLY a raw JSON array, no markdown, no explanation:
+[{{"label": "Resistor (NEMA)", "bbox": [10, 20, 80, 60]}}, ...]"""
 
             try:
-                response = client.chat.completions.create(
-                    model="gemini-2.0-flash",
-                    messages=[{
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "image_url",
-                                "image_url": {"url": f"data:image/png;base64,{page_b64}"}
-                            },
-                            {"type": "text", "text": ai_prompt}
-                        ]
-                    }],
-                    max_tokens=4000,
-                    temperature=0.1,
+                pil_image = Image.open(io.BytesIO(page_png))
+                response  = model.generate_content(
+                    [ai_prompt, pil_image],
+                    generation_config=genai.GenerationConfig(
+                        temperature=0.1,
+                        max_output_tokens=4000,
+                    )
                 )
-                raw_response = response.choices[0].message.content or ""
+                raw_response = response.text or ""
             except Exception as e:
                 st.warning(f"Page {page_num+1}: AI call failed — {e}")
                 continue
 
-            # ── Parse JSON response ───────────────────────────
+            # ── Parse JSON ────────────────────────────────────
             try:
-                clean = raw_response.strip()
-                # Strip markdown fences if present
-                clean = re.sub(r"^```[a-z]*\n?", "", clean)
-                clean = re.sub(r"\n?```$", "", clean)
+                clean   = raw_response.strip()
+                clean   = re.sub(r"^```[a-z]*\n?", "", clean)
+                clean   = re.sub(r"\n?```$",        "", clean).strip()
                 entries = json.loads(clean)
             except Exception:
-                # Try to extract JSON array from anywhere in the response
-                match = re.search(r'\[.*\]', raw_response, re.DOTALL)
+                match = re.search(r'\[.*?\]', raw_response, re.DOTALL)
                 if not match:
                     st.warning(f"Page {page_num+1}: Could not parse AI response.")
                     continue
@@ -759,37 +735,29 @@ Return ONLY a valid JSON array, no explanation, no markdown:
                     continue
                 label = str(entry.get("label", "")).strip()
                 bbox  = entry.get("bbox")
-
                 if not label or not bbox or len(bbox) != 4:
                     continue
 
-                # Clamp bbox to image bounds
-                x1 = max(0, int(bbox[0]))
-                y1 = max(0, int(bbox[1]))
+                x1 = max(0,  int(bbox[0]))
+                y1 = max(0,  int(bbox[1]))
                 x2 = min(pw, int(bbox[2]))
                 y2 = min(ph, int(bbox[3]))
 
-                if x2 <= x1 or y2 <= y1:
-                    continue
-                if (x2 - x1) < 10 or (y2 - y1) < 10:
+                if x2 <= x1 or y2 <= y1 or (x2-x1) < 10 or (y2-y1) < 10:
                     continue
 
-                # Add small padding around crop
-                pad = 6
+                pad  = 8
                 crop = page_img.crop((
-                    max(0, x1 - pad), max(0, y1 - pad),
+                    max(0,  x1 - pad), max(0,  y1 - pad),
                     min(pw, x2 + pad), min(ph, y2 + pad)
                 ))
-
                 buf = io.BytesIO()
                 crop.save(buf, format="PNG")
-                img_bytes = buf.getvalue()
-
-                all_pairs.append({"img_bytes": img_bytes, "answer": label})
+                all_pairs.append({"img_bytes": buf.getvalue(), "answer": label})
 
         doc.close()
 
-        # Deduplicate by label (keep first occurrence)
+        # Deduplicate by label
         seen, unique = set(), []
         for p in all_pairs:
             key = p["answer"].lower().strip()
@@ -1039,4 +1007,3 @@ pages = {
 
 pg = st.navigation(pages)
 pg.run()
-
