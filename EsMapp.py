@@ -643,11 +643,12 @@ def symbol_quiz():
     # ── Session state ─────────────────────────────────────────
     if "sq" not in st.session_state:
         st.session_state.sq = {
-            "pairs":        [],   # [{"img_bytes": bytes, "answer": str}]
-            "quiz":         [],   # shuffled subset of pairs
-            "user_answers": {},   # index -> str
+            "pairs":        [],
+            "quiz":         [],
+            "user_answers": {},
             "submitted":    False,
             "num_q":        10,
+            "api_key":      os.environ.get("GEMINI_API_KEY", ""),
         }
     sq = st.session_state.sq
 
@@ -660,10 +661,9 @@ def symbol_quiz():
         """
         import re
 
-        # ── Get API key from Replit secret ────────────────────
-        api_key = os.environ.get("GEMINI_API_KEY", "")
+        api_key = sq.get("api_key", "").strip()
         if not api_key:
-            st.error("❌ GEMINI_API_KEY not found. Add it in Replit → Secrets (🔒).")
+            st.error("❌ Please enter your Gemini API key in the sidebar.")
             return []
 
         genai.configure(api_key=api_key)
@@ -803,21 +803,34 @@ Return ONLY a raw JSON array, no markdown, no explanation:
     # ─────────────────────────────────────────────────────────
     with st.sidebar:
         st.header("⚙️ Symbol Quiz Settings")
+
+        # API key input — pre-filled from env if available
+        key_input = st.text_input(
+            "🔑 Gemini API Key",
+            value=sq["api_key"],
+            type="password",
+            placeholder="Paste your Gemini API key here",
+            help="Get a free key at aistudio.google.com → Get API key",
+        )
+        if key_input != sq["api_key"]:
+            sq["api_key"] = key_input
+
+        if not sq["api_key"]:
+            st.warning("Enter your Gemini API key above to continue.")
+
+        st.divider()
         uploaded_pdf  = st.file_uploader("📄 Upload Symbol PDF", type=["pdf"])
         num_questions = st.slider("Questions per round", min_value=3, max_value=40, value=10)
 
-        if uploaded_pdf and st.button("📥 Load PDF & Build Quiz", type="primary"):
+        ready = bool(sq["api_key"]) and uploaded_pdf is not None
+        if st.button("📥 Load PDF & Build Quiz", type="primary", disabled=not ready):
             total_pages = fitz.open(stream=uploaded_pdf.read(), filetype="pdf").page_count
-            uploaded_pdf.seek(0)  # reset after peek
-            with st.spinner(f"AI is reading {total_pages} page(s) — this may take ~{total_pages * 5}s…"):
+            uploaded_pdf.seek(0)
+            with st.spinner(f"AI is reading {total_pages} page(s) — ~{total_pages * 8}s…"):
                 pairs = extract_pairs_via_ai(uploaded_pdf)
 
             if not pairs:
-                st.error(
-                    "No symbol pairs were found.\n\n"
-                    "Make sure the PDF is **not a scanned image** (text must be selectable) "
-                    "and that each symbol has a visible label nearby."
-                )
+                st.error("No symbol pairs found. Check that the PDF has real symbol drawings with text labels.")
             else:
                 st.success(f"✅ Found {len(pairs)} symbol pairs!")
                 pool = pairs.copy()
