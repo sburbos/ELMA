@@ -689,15 +689,36 @@ def symbol_quiz():
                 if not text_blocks:
                     continue
 
-                def score(b):
-                    bx0, by0, bx1, by1 = b[0], b[1], b[2], b[3]
-                    vert  = min(abs(by0 - img_rect.y1), abs(by1 - img_rect.y0))
-                    horiz = abs((bx0 + bx1) / 2 - icx) * 0.3
-                    return vert + horiz
+                # Layout: [label] [image] [image] [label]
+                # The label is to the LEFT of the image, on the same row.
+                # Step 1: filter to blocks that are:
+                #   - horizontally to the left of the image (right edge of text <= left edge of image + small overlap)
+                #   - vertically overlapping the image row (centres within image height + tolerance)
+                img_h      = img_rect.y1 - img_rect.y0
+                row_top    = img_rect.y0 - img_h * 0.6
+                row_bottom = img_rect.y1 + img_h * 0.6
 
-                best  = min(text_blocks, key=score)
-                if score(best) > 120:
-                    continue
+                left_candidates = [
+                    b for b in text_blocks
+                    if b[2] <= img_rect.x0 + 20           # text right edge is left of image
+                    and row_top <= (b[1] + b[3]) / 2 <= row_bottom  # same row
+                ]
+
+                # Step 2: if nothing to the left, fall back to closest block overall
+                # (handles edge cases like single-column pages)
+                if left_candidates:
+                    # Pick the one whose right edge is closest to the image left edge
+                    best = min(left_candidates, key=lambda b: img_rect.x0 - b[2])
+                else:
+                    def score(b):
+                        bx0, by0, bx1, by1 = b[0], b[1], b[2], b[3]
+                        vert  = min(abs(by0 - img_rect.y1), abs(by1 - img_rect.y0))
+                        horiz = abs((bx0 + bx1) / 2 - icx) * 0.3
+                        return vert + horiz
+                    best = min(text_blocks, key=score)
+                    if score(best) > 120:
+                        continue
+
                 label = best[4].strip().replace("\n", " ")
                 if not label or len(label) > 120:
                     continue
