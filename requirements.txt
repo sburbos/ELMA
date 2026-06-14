@@ -9,5 +9,6 @@ pymupdf
 Pillow
 python-dotenv>=1.0.0
 requests
+fpdf2
 
 google-generativeai
