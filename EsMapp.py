@@ -35,7 +35,7 @@ def ai_assistant(prompt, rule):
     """OpenAI-compatible wrapper for Gemini Flash"""
     try:
         client = OpenAI(
-            api_key=os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6K8lvO6_K1DIEDKPGuZOiNO6DhJGCsG0kmsOm7E-45kcg"),
+            api_key=os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6J_5p7-FoIn-XWewA7_01jM0IS0YA9q1DXtZkN48NZ8oQ"),
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
         )
         messages = []
