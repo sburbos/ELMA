@@ -954,6 +954,264 @@ def about():
 
 
 # ─────────────────────────────────────────────────────────────
+#  TRANS MAKER (PPTX / PDF / DOCX → condensed "trans" PDF)
+# ─────────────────────────────────────────────────────────────
+def trans_maker():
+    import textwrap
+    from fpdf import FPDF
+
+    st.title("📚 Trans Maker")
+    st.caption("Convert PPTX, PDF, or DOCX lecture files into a condensed, multi-column 'trans' PDF — with images included.")
+
+    trans_system = """You are "Trans Maker", an academic note-condenser used by college students
+to create "trans" (transcription/reviewer notes) from lecture slides or documents.
+
+STRICT RULES:
+1. Base your output ONLY on the given source text. Do NOT add outside facts, examples,
+   definitions, or information that is not present in the source.
+2. If the source text is empty, sparse, or just a title/header, keep the output minimal —
+   do not invent content to fill space.
+3. Write in clear, concise, easy-to-understand bullet points suitable for reviewing/studying.
+4. Use short phrases, not long paragraphs. Preserve key terms, definitions, formulas,
+   and numbers exactly as given in the source.
+5. Do NOT include meta-commentary, labels like "Summary:", or any text besides the JSON.
+
+Return ONLY valid JSON in this exact format, nothing else:
+{"title": "short title for this section/slide", "bullets": ["point 1", "point 2", ...]}"""
+
+    # ── extraction helpers ──────────────────────────────────
+    def extract_units_pdf(file_bytes):
+        doc = fitz.open(stream=file_bytes, filetype="pdf")
+        units = []
+        for page in doc:
+            text = page.get_text().strip()
+            images = []
+            for img_info in page.get_images(full=True):
+                xref = img_info[0]
+                try:
+                    base_img = doc.extract_image(xref)
+                    if base_img["width"] >= 40 and base_img["height"] >= 40:
+                        images.append(base_img["image"])
+                except Exception:
+                    pass
+            if text or images:
+                units.append({"text": text, "images": images})
+        doc.close()
+        return units
+
+    def extract_units_pptx(file_bytes):
+        from pptx import Presentation
+        from pptx.enum.shapes import MSO_SHAPE_TYPE
+        prs = Presentation(io.BytesIO(file_bytes))
+        units = []
+        for slide in prs.slides:
+            text_parts, images = [], []
+            for shape in slide.shapes:
+                if shape.has_text_frame:
+                    for para in shape.text_frame.paragraphs:
+                        t = "".join(r.text for r in para.runs)
+                        if t.strip():
+                            text_parts.append(t.strip())
+                if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+                    try:
+                        images.append(shape.image.blob)
+                    except Exception:
+                        pass
+            text = "\n".join(text_parts).strip()
+            if text or images:
+                units.append({"text": text, "images": images})
+        return units
+
+    def extract_units_docx(file_bytes):
+        try:
+            import docx
+        except ImportError:
+            st.error("Please install python-docx: pip install python-docx")
+            return []
+        d = docx.Document(io.BytesIO(file_bytes))
+        images = []
+        for rel in d.part.rels.values():
+            if "image" in rel.reltype:
+                try:
+                    images.append(rel.target_part.blob)
+                except Exception:
+                    pass
+        full_text = "\n".join(p.text.strip() for p in d.paragraphs if p.text.strip())
+        chunk_size = 1400
+        chunks = [full_text[i:i + chunk_size] for i in range(0, len(full_text), chunk_size)] or [""]
+        units = [{"text": c, "images": []} for c in chunks]
+        if images:
+            per = max(1, len(images) // len(units))
+            for idx, img in enumerate(images):
+                units[min(idx // per, len(units) - 1)]["images"].append(img)
+        return [u for u in units if u["text"] or u["images"]]
+
+    # ── AI condensation ──────────────────────────────────────
+    def condense_unit(text):
+        if not text.strip():
+            return {"title": "", "bullets": []}
+        prompt = f"Source content:\n{text[:6000]}"
+        out = ai_assistant(prompt, trans_system)
+        if not out:
+            return {"title": "", "bullets": [text[:300]]}
+        clean = out.strip().strip("`")
+        if clean.lower().startswith("json"):
+            clean = clean[4:].strip()
+        try:
+            data = json.loads(clean)
+            title = str(data.get("title", "")).strip()
+            bullets = [str(b).strip() for b in data.get("bullets", []) if str(b).strip()]
+            return {"title": title, "bullets": bullets}
+        except Exception:
+            return {"title": "", "bullets": [clean[:400]]}
+
+    # ── PDF helper: sanitize for core (latin-1) fonts ───────
+    def safe(t):
+        return t.encode("latin-1", "replace").decode("latin-1")
+
+    # ── multi-column PDF builder ────────────────────────────
+    class ColumnPDF(FPDF):
+        def __init__(self, num_cols=2):
+            super().__init__(format="A4")
+            self.num_cols = num_cols
+            self.margin_l = 10
+            self.gutter = 6
+            self.set_auto_page_break(False)
+            self.set_margins(self.margin_l, 10, self.margin_l)
+            self.col_width = (210 - 2 * self.margin_l - (num_cols - 1) * self.gutter) / num_cols
+            self.col_idx = 0
+            self.add_page()
+            self.col_y = [12] * num_cols
+
+        def col_x(self, idx):
+            return self.margin_l + idx * (self.col_width + self.gutter)
+
+        def next_column(self):
+            self.col_idx += 1
+            if self.col_idx >= self.num_cols:
+                self.col_idx = 0
+                self.add_page()
+                self.col_y = [12] * self.num_cols
+
+        def add_section(self, title, bullets, images):
+            chars_per_line = max(10, int(self.col_width / 1.7))
+            line_h = 4.6
+            est_lines = len(textwrap.wrap(title, chars_per_line)) or 1
+            for b in bullets:
+                est_lines += len(textwrap.wrap("• " + b, chars_per_line)) or 1
+            text_h = est_lines * line_h + 4
+
+            img_heights, tmp_paths = [], []
+            for img_bytes in images:
+                try:
+                    im = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+                    w, h = im.size
+                    ih = min(self.col_width * h / w, 75)
+                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+                    im.save(tmp.name, format="PNG")
+                    tmp_paths.append(tmp.name)
+                    img_heights.append(ih + 3)
+                except Exception:
+                    img_heights.append(0)
+                    tmp_paths.append(None)
+
+            total_h = text_h + sum(img_heights)
+            page_h = 297 - 10
+
+            if self.col_y[self.col_idx] + min(total_h, page_h - 14) > page_h:
+                self.next_column()
+
+            x = self.col_x(self.col_idx)
+            y = self.col_y[self.col_idx]
+            self.set_xy(x, y)
+
+            if title:
+                self.set_font("Helvetica", "B", 10)
+                self.set_x(x)
+                self.multi_cell(self.col_width, line_h, safe(title))
+
+            self.set_font("Helvetica", "", 8.5)
+            for b in bullets:
+                self.set_x(x)
+                self.multi_cell(self.col_width, line_h, safe("• " + b))
+
+            cur_y = self.get_y()
+            for tmp_path, ih in zip(tmp_paths, img_heights):
+                if not tmp_path or ih == 0:
+                    continue
+                if cur_y + ih > page_h:
+                    self.col_y[self.col_idx] = cur_y + 2
+                    self.next_column()
+                    x = self.col_x(self.col_idx)
+                    cur_y = self.col_y[self.col_idx]
+                    self.set_xy(x, cur_y)
+                self.image(tmp_path, x=x, y=cur_y, w=self.col_width)
+                cur_y += ih
+                os.remove(tmp_path)
+
+            self.col_y[self.col_idx] = cur_y + 4
+
+    # ── UI ───────────────────────────────────────────────────
+    uploaded_file = st.file_uploader("Upload lecture file", type=["pdf", "pptx", "docx"])
+    num_cols = st.select_slider("Columns per page (more = fits more, smaller text)", options=[2, 3], value=2)
+    title_input = st.text_input("Trans Title (optional)", "")
+
+    if st.button("Generate Trans", type="primary"):
+        if not uploaded_file:
+            st.warning("Please upload a PDF, PPTX, or DOCX file")
+            return
+        file_bytes = uploaded_file.getvalue()
+        ext = uploaded_file.name.split(".")[-1].lower()
+
+        with st.spinner("Extracting content from file..."):
+            if ext == "pdf":
+                units = extract_units_pdf(file_bytes)
+            elif ext == "pptx":
+                units = extract_units_pptx(file_bytes)
+            elif ext == "docx":
+                units = extract_units_docx(file_bytes)
+            else:
+                st.error("Unsupported file type")
+                return
+
+        if not units:
+            st.error("No readable content found in the uploaded file")
+            return
+
+        progress = st.progress(0, text="Condensing content into trans notes...")
+        sections = []
+        for i, unit in enumerate(units):
+            condensed = condense_unit(unit["text"])
+            condensed["images"] = unit["images"]
+            sections.append(condensed)
+            progress.progress((i + 1) / len(units), text=f"Processing {i + 1}/{len(units)}...")
+        progress.empty()
+
+        with st.spinner("Building trans PDF..."):
+            pdf = ColumnPDF(num_cols=num_cols)
+            if title_input.strip():
+                pdf.set_font("Helvetica", "B", 14)
+                pdf.set_xy(10, 10)
+                pdf.cell(0, 8, safe(title_input.strip()), ln=1)
+                pdf.col_y = [pdf.get_y() + 2] * num_cols
+
+            for sec in sections:
+                if not sec["title"] and not sec["bullets"] and not sec.get("images"):
+                    continue
+                pdf.add_section(sec["title"], sec["bullets"], sec.get("images", []))
+
+            pdf_bytes = bytes(pdf.output())
+
+        st.success(f"✅ Trans generated from {len(sections)} section(s)!")
+        st.download_button(
+            "📥 Download Trans PDF",
+            data=pdf_bytes,
+            file_name=f"{(title_input.strip() or uploaded_file.name.rsplit('.', 1)[0])}_trans.pdf",
+            mime="application/pdf"
+        )
+
+
+# ─────────────────────────────────────────────────────────────
 #  NAVIGATION
 # ─────────────────────────────────────────────────────────────
 pages = {
@@ -964,7 +1222,8 @@ pages = {
         st.Page(tetos,              title="Text To Speech"),
         st.Page(pdf2quiz,           title="Pdf To Quiz"),
         st.Page(turnitin_knockoff,  title="Originality Checker"),
-        st.Page(symbol_quiz,        title="Symbol Quiz"),   # ← NEW
+        st.Page(symbol_quiz,        title="Symbol Quiz"),
+        st.Page(trans_maker,        title="Transes Generator")# ← NEW
     ],
     "About": [st.Page(about, title="About")],
 }
